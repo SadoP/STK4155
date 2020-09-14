@@ -1,30 +1,10 @@
 import matplotlib.pyplot as plt
-from matplotlib import cm
-from matplotlib.ticker import LinearLocator, FormatStrFormatter
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import scale
+from sklearn.utils import resample
 import colormaps as cmaps
-
-
-def plot_franke(own_x=np.array([]), own_y=np.array([]), own_z=np.array([])):
-    x, y = create_grid(.01)
-    z = franke(x, y, 0)
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    # Plot the surface.
-    if own_z.size > 0:
-        surf = ax.plot_surface(own_x, own_y, (franke(own_x, own_y, 0)-own_z.reshape(own_y.shape)), cmap=cm.coolwarm, linewidth=0, antialiased=False)
-    else:
-        surf = ax.plot_surface(x, y, z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-    # Customize the z axis.
-    ax.set_zlim(-0.10, 1.40)
-    ax.zaxis.set_major_locator(LinearLocator(10))
-    ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
-    # Add a color bar which maps values to colors.
-    fig.colorbar(surf, shrink=0.5, aspect=5)
-    plt.show()
 
 
 def franke(x, y, noise_level):
@@ -71,22 +51,32 @@ def create_grid(res):
     return x, y
 
 
-def create_data(deg):
+def create_data(deg, cross_validation=0):
     x, y = create_grid(RESOLUTION)
-    """
-    I know this is not the most elegant way and the proper way would be to first calculated a total Matrix X and then
-    split it into test and training data, but I want to be able to plot the results of the test and training data, 
-    for which I will need to have the x- and y- coordinates before I did the split.
-    """
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
-    X_train = coords_to_polynomial(x_train, y_train, deg)
-    Z_train = franke(x_train, y_train, NOISE_LEVEL).flatten()
-    X_test = coords_to_polynomial(x_test, y_test, deg)
-    Z_test = franke(x_test, y_test, NOISE_LEVEL).flatten()
-    if(SCALE_DATA):
-        X_train = scale(X_train, axis=1)
-        X_test  = scale(X_test, axis=1)
-    return X_train, X_test, Z_train, Z_test, x_train, x_test, y_train, y_test
+    X = coords_to_polynomial(x, y, deg)
+    Z = franke(x, y, NOISE_LEVEL).flatten()
+    if SCALE_DATA:
+        X = scale(X, axis=1)
+    if cross_validation:
+        k = int(cross_validation)
+        n = int(X.shape[0])
+        m = int(X.shape[1])
+        l = int(np.floor(n/k))
+        print(k, n, m, l)
+        X, Z = resample(X, Z, random_state=RANDOM_SEED)
+        X_train = np.zeros(shape=(l*(k-1), m, k))
+        X_test = np.zeros(shape=(l, m, k))
+        Z_train = np.zeros(shape=(l*(k-1), k))
+        Z_test = np.zeros(shape=(l, k))
+        for i in range(k):
+            X_train[:, :, i] = np.delete(X, np.arange(i*l, (i+1)*l, 1, int), axis=0)
+            X_test[:, :, i] = X[i*l:(i+1)*l, :]
+            Z_train[:, i] = np.delete(Z, np.arange(i*l, (i+1)*l, 1, int), axis=0)
+            Z_test[:, i] = Z[i*l:(i+1)*l]
+        return X_train, X_test, Z_train, Z_test
+    else:
+        X_train, X_test, Z_train, Z_test = train_test_split(X, Z, test_size=0.2)
+        return X_train, X_test, Z_train, Z_test
 
 
 def predict(beta, X):
@@ -98,14 +88,13 @@ def err_from_var(var, ssize):
 
 
 def train(deg):
-    X_train, X_test, Z_train, Z_test, x_tr, x_te, y_tr, y_te = create_data(deg)
+    X_train, X_test, Z_train, Z_test = create_data(deg)
     beta, var = solve_lin_equ(Z_train.flatten(), X_train)
     err = err_from_var(var, len(Z_train))
     test_R = r2_error(Z_test, predict(beta, X_test))
     test_M = mse_error(Z_test, predict(beta, X_test))
     train_R = r2_error(Z_train, predict(beta, X_train))
     train_M = mse_error(Z_train, predict(beta, X_train))
-    #plot_franke(x_tr, y_tr, predict(beta, X_train))
     return beta, var, err, test_R, train_R, test_M, train_M
 
 
@@ -185,13 +174,18 @@ def task_b():
 
 NOISE_LEVEL = 0.2
 MAX_DEG = 25
-RESOLUTION = .05
+RESOLUTION = .1
 RANDOM_SEED = 1337
 
 
 np.random.seed(RANDOM_SEED)
 #plot_franke()
 SCALE_DATA = False
-task_a()
-SCALE_DATA = True
-task_b()
+#task_a()
+#SCALE_DATA = True
+#task_b()
+
+
+X_train, X_test, Z_train, Z_test = create_data(2, 2)
+print(X_train.shape())
+
