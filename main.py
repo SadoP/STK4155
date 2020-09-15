@@ -38,9 +38,13 @@ def coords_to_polynomial(x, y, p):
     return poly.fit_transform(X)
 
 
-def solve_lin_equ(y, x):
-    var = np.linalg.inv(x.transpose() @ x)
-    beta = np.linalg.pinv(x) @ y
+def solve_lin_equ(y, x, solver="least_squares"):
+    if solver == "least_squares":
+        var = np.linalg.inv(x.transpose() @ x)
+        beta = np.linalg.pinv(x) @ y
+    elif solver == "lasso":
+        var = np.linalg.inv()
+        beta = np.linalg.pinv()
     return beta, var.diagonal()
 
 
@@ -152,17 +156,6 @@ def train_degs(maxdeg, cross_validation=1, bootstraps=0):
     return test_R, train_R, test_M, train_M, beta, var, err
 
 
-def task_a():
-    deg = 5
-    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg)
-    print_cont(deg, err, "error")
-    print_cont(deg, beta, "betas")
-    print_cont(deg, np.nan_to_num(np.divide(err, beta), nan=0), "errorByBeta")
-    errors = [test_M, train_M, test_R, train_R]
-    labels = ["test MSE", "train MSE", "test R^2", "train R^2"]
-    print_errors(deg, errors, labels, "errors")
-
-
 def print_errors(deg, errors, labels, name, log=False):
     fig = plt.figure(figsize=(8, 8), dpi=300)
     x_values = np.linspace(1, deg, deg)
@@ -191,6 +184,17 @@ def print_cont(deg, data, name):
     fig.savefig("images/"+name+".png", dpi=300)
 
 
+def task_a():
+    deg = 5
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg)
+    print_cont(deg, err, "error")
+    print_cont(deg, beta, "betas")
+    print_cont(deg, np.nan_to_num(np.divide(err, beta), nan=0), "errorByBeta")
+    errors = [test_M, train_M, test_R, train_R]
+    labels = ["test MSE", "train MSE", "test R^2", "train R^2"]
+    print_errors(deg, errors, labels, "errors")
+
+
 def task_b():
     deg = MAX_DEG
     test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg)
@@ -206,11 +210,10 @@ def task_b():
 def task_c():
     cross_validation = CROSS_VALIDATION
     deg = MAX_DEG
-    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg, cross_validation)
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg, cross_validation=cross_validation)
     errors = [test_M, train_M]
     labels = ["test MSE", "train MSE"]
     print_errors(deg, errors, labels, "errors_highdeg_crossvalidation", True)
-
 
 
 NOISE_LEVEL = 0.2
