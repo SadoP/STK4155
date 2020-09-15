@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import scale
-from sklearn.utils import resample
+from sklearn.utils import shuffle
 import colormaps as cmaps
 
 
@@ -51,32 +51,38 @@ def create_grid(res):
     return x, y
 
 
-def create_data(deg, cross_validation=0):
+def create_data(deg, cross_validation=1):
     x, y = create_grid(RESOLUTION)
     X = coords_to_polynomial(x, y, deg)
     Z = franke(x, y, NOISE_LEVEL).flatten()
     if SCALE_DATA:
         X = scale(X, axis=1)
-    if cross_validation:
-        k = int(cross_validation)
-        n = int(X.shape[0])
-        m = int(X.shape[1])
-        l = int(np.floor(n/k))
-        print(k, n, m, l)
-        X, Z = resample(X, Z, random_state=RANDOM_SEED)
-        X_train = np.zeros(shape=(l*(k-1), m, k))
-        X_test = np.zeros(shape=(l, m, k))
-        Z_train = np.zeros(shape=(l*(k-1), k))
-        Z_test = np.zeros(shape=(l, k))
-        for i in range(k):
-            X_train[:, :, i] = np.delete(X, np.arange(i*l, (i+1)*l, 1, int), axis=0)
-            X_test[:, :, i] = X[i*l:(i+1)*l, :]
-            Z_train[:, i] = np.delete(Z, np.arange(i*l, (i+1)*l, 1, int), axis=0)
-            Z_test[:, i] = Z[i*l:(i+1)*l]
-        return X_train, X_test, Z_train, Z_test
+    n = int(X.shape[0])
+    m = int(X.shape[1])
+    if cross_validation == 1:
+        k = 1
+        l = int(np.floor(n*0.2))
+        train_l = int(np.floor(n*0.8))
     else:
-        X_train, X_test, Z_train, Z_test = train_test_split(X, Z, test_size=0.2)
-        return X_train, X_test, Z_train, Z_test
+        k = int(cross_validation)
+        l = int(np.floor(n / k))
+        train_l = l*(k-1)
+    test_l = l
+    X, Z = shuffle(X, Z, random_state=RANDOM_SEED)
+    X_train = np.zeros(shape=(k, train_l, m))
+    X_test = np.zeros(shape=(k, test_l, m))
+    Z_train = np.zeros(shape=(k, train_l))
+    Z_test = np.zeros(shape=(k, test_l))
+    for i in range(k):
+        X_train[i, :, :] = np.delete(X, np.arange(i*l, (i+1)*l, 1, int), axis=0)
+        X_test[i, :, :] = X[i*l:(i+1)*l, :]
+        Z_train[i, :] = np.delete(Z, np.arange(i*l, (i+1)*l, 1, int), axis=0)
+        Z_test[i, :] = Z[i*l:(i+1)*l]
+    X_train = np.transpose(X_train, (1, 2, 0))
+    X_test = np.transpose(X_test, (1, 2, 0))
+    Z_train = np.transpose(Z_train, (1, 0))
+    Z_test = np.transpose(Z_test, (1, 0))
+    return X_train, X_test, Z_train, Z_test
 
 
 def predict(beta, X):
@@ -87,14 +93,35 @@ def err_from_var(var, ssize):
     return 1.97 * np.sqrt(var) / np.sqrt(ssize)
 
 
-def train(deg):
-    X_train, X_test, Z_train, Z_test = create_data(deg)
-    beta, var = solve_lin_equ(Z_train.flatten(), X_train)
-    err = err_from_var(var, len(Z_train))
-    test_R = r2_error(Z_test, predict(beta, X_test))
-    test_M = mse_error(Z_test, predict(beta, X_test))
-    train_R = r2_error(Z_train, predict(beta, X_train))
-    train_M = mse_error(Z_train, predict(beta, X_train))
+def train(deg, cross_validation=1, bootstraps=0):
+    X_train, X_test, Z_train, Z_test = create_data(deg, cross_validation)
+    testRs = np.zeros(shape=cross_validation)
+    testMs = np.zeros(shape=cross_validation)
+    trainRs = np.zeros(shape=cross_validation)
+    trainMs = np.zeros(shape=cross_validation)
+    for i in range(cross_validation):
+        beta, var = solve_lin_equ(Z_train[:, i].flatten(), X_train[:, :, i])
+        err = err_from_var(var, len(Z_train[:, i]))
+        if bootstraps > 0:
+            L = X_test.shape[0]
+            inds = np.random.randint(0, high=L, size=bootstraps)
+            testx = X_test[inds, :, i]
+            trainx = X_train[inds, :, i]
+            testz = Z_test[inds, i]
+            trainz = Z_train[inds, i]
+        else:
+            testx = X_test[:, :, i]
+            trainx = X_train[:, :, i]
+            testz = Z_test[:, i]
+            trainz = Z_train[:, i]
+        testRs[i] = r2_error(testz, predict(beta, testx))
+        testMs[i] = mse_error(testz, predict(beta, testx))
+        trainRs[i] = r2_error(trainz, predict(beta, trainx))
+        trainMs[i] = mse_error(trainz, predict(beta, trainx))
+    test_R = np.average(testRs)
+    train_R = np.average(trainRs)
+    test_M = np.average(testMs)
+    train_M = np.average(trainMs)
     return beta, var, err, test_R, train_R, test_M, train_M
 
 
@@ -102,7 +129,7 @@ def maxMatLen(maxdeg):
     return int((maxdeg+2)*(maxdeg+1)/2)
 
 
-def train_degs(maxdeg):
+def train_degs(maxdeg, cross_validation=1, bootstraps=0):
     beta = np.zeros(shape=(maxdeg, maxMatLen(maxdeg)))
     var = np.zeros(shape=(maxdeg, maxMatLen(maxdeg)))
     err = np.zeros(shape=(maxdeg, maxMatLen(maxdeg)))
@@ -111,7 +138,7 @@ def train_degs(maxdeg):
     test_M = np.zeros(shape=(maxdeg, 1))
     train_M = np.zeros(shape=(maxdeg, 1))
     for i in range(maxdeg):
-        t = train(i+1)
+        t = train(i+1, cross_validation=cross_validation, bootstraps=bootstraps)
         b = t[0]
         beta[i, 0:len(b)] = b
         v = t[1]
@@ -170,22 +197,34 @@ def task_b():
     errors = [test_M, train_M]
     labels = ["test MSE", "train MSE"]
     print_errors(deg, errors, labels, "errors_highdeg", True)
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg, bootstraps=40)
+    errors = [test_M, train_M]
+    labels = ["test MSE", "train MSE"]
+    print_errors(deg, errors, labels, "errors_highdeg_bootstrap", True)
+
+
+def task_c():
+    cross_validation = CROSS_VALIDATION
+    deg = MAX_DEG
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg, cross_validation)
+    errors = [test_M, train_M]
+    labels = ["test MSE", "train MSE"]
+    print_errors(deg, errors, labels, "errors_highdeg_crossvalidation", True)
+
 
 
 NOISE_LEVEL = 0.2
 MAX_DEG = 25
-RESOLUTION = .1
+RESOLUTION = .05
 RANDOM_SEED = 1337
-
+CROSS_VALIDATION = 5
 
 np.random.seed(RANDOM_SEED)
 #plot_franke()
 SCALE_DATA = False
 #task_a()
-#SCALE_DATA = True
-#task_b()
+SCALE_DATA = True
+task_b()
+task_c()
 
-
-X_train, X_test, Z_train, Z_test = create_data(2, 2)
-print(X_train.shape())
-
+X_train, X_test, Z_train, Z_test = create_data(2, 1)
