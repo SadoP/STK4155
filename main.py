@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn import linear_model
 from sklearn.model_selection import train_test_split
+from sklearn import linear_model
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import scale
 from sklearn.utils import shuffle
@@ -45,6 +47,11 @@ def solve_lin_equ(y, x, solver="ols", l=1):
     elif solver == "ridge":
         var = np.linalg.inv(x.transpose() @ x + l * np.identity(x.shape[1]))
         beta = var @ x.transpose() @ y
+    elif solver == "lasso":
+        clf = linear_model.Lasso(alpha=l)
+        clf.fit(x, y)
+        beta = clf.coef_
+        var = np.zeros(shape=(1, 1))
     return beta, var.diagonal()
 
 
@@ -245,6 +252,31 @@ def task_d():
                  True)
 
 
+def task_e():
+    deg = 5
+    order = np.array([-3, 1])
+    N = int(np.linalg.norm(order, 1) * 50)
+    test_R = np.zeros(shape=(deg, N))
+    train_R = np.zeros(shape=(deg, N))
+    test_M = np.zeros(shape=(deg, N))
+    train_M = np.zeros(shape=(deg, N))
+    lambdas = np.logspace(order[0], order[1], num=N)
+    i = 0
+    for l in lambdas:
+        test_R[:, i], train_R[:, i], test_M[:, i], train_M[:, i], beta, var, err = train_degs(
+            maxdeg=deg, cross_validation=5, bootstraps=1000, solver="lasso", l=l)
+        i = i + 1
+    errors = np.array([test_M, train_M])
+    labels = []
+    for i in range(deg):
+        labels.extend(["test MSE" + str(i + 1), "train MSE" + str(i + 1)])
+    print_errors(np.tile(lambdas.transpose(), (deg, 1)).transpose(), errors.transpose((0, 2, 1)),
+                 labels,
+                 "errors_lasso",
+                 True,
+                 True)
+
+
 NOISE_LEVEL = 0.5
 MAX_DEG = 25
 RESOLUTION = .10
@@ -258,5 +290,6 @@ SCALE_DATA = False
 SCALE_DATA = True
 #task_b()
 #task_c()
-task_d()
-X_train, X_test, Z_train, Z_test = create_data(2, 1)
+#task_d()
+task_e()
+#X_train, X_test, Z_train, Z_test = create_data(2, 1)
