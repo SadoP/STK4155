@@ -16,7 +16,7 @@ def franke(x, y, noise_level):
     term3 = 0.5 * np.exp(-(9 * x - 7) ** 2 / 4.0 - 0.25 * ((9 * y - 3) ** 2))
     term4 = -0.2 * np.exp(-(9 * x - 4) ** 2 - (9 * y - 7) ** 2)
     noise = np.random.normal(0, 1, term4.shape)
-    return term1 + term2 + term3 + term4 + noise_level*noise
+    return term1 + term2 + term3 + term4 + noise_level * noise
 
 
 def r2_error(y_data, y_model):
@@ -38,13 +38,13 @@ def coords_to_polynomial(x, y, p):
     return poly.fit_transform(X)
 
 
-def solve_lin_equ(y, x, solver="least_squares"):
-    if solver == "least_squares":
+def solve_lin_equ(y, x, solver="ols", l=1):
+    if solver == "ols":
         var = np.linalg.inv(x.transpose() @ x)
         beta = np.linalg.pinv(x) @ y
-    elif solver == "lasso":
-        var = np.linalg.inv()
-        beta = np.linalg.pinv()
+    elif solver == "ridge":
+        var = np.linalg.inv(x.transpose() @ x + l * np.identity(x.shape[1]))
+        beta = var @ x.transpose() @ y
     return beta, var.diagonal()
 
 
@@ -65,12 +65,12 @@ def create_data(deg, cross_validation=1):
     m = int(X.shape[1])
     if cross_validation == 1:
         k = 1
-        l = int(np.floor(n*0.2))
-        train_l = int(np.floor(n*0.8))
+        l = int(np.floor(n * 0.2))
+        train_l = int(np.floor(n * 0.8))
     else:
         k = int(cross_validation)
         l = int(np.floor(n / k))
-        train_l = l*(k-1)
+        train_l = l * (k - 1)
     test_l = l
     X, Z = shuffle(X, Z, random_state=RANDOM_SEED)
     X_train = np.zeros(shape=(k, train_l, m))
@@ -78,10 +78,10 @@ def create_data(deg, cross_validation=1):
     Z_train = np.zeros(shape=(k, train_l))
     Z_test = np.zeros(shape=(k, test_l))
     for i in range(k):
-        X_train[i, :, :] = np.delete(X, np.arange(i*l, (i+1)*l, 1, int), axis=0)
-        X_test[i, :, :] = X[i*l:(i+1)*l, :]
-        Z_train[i, :] = np.delete(Z, np.arange(i*l, (i+1)*l, 1, int), axis=0)
-        Z_test[i, :] = Z[i*l:(i+1)*l]
+        X_train[i, :, :] = np.delete(X, np.arange(i * l, (i + 1) * l, 1, int), axis=0)
+        X_test[i, :, :] = X[i * l:(i + 1) * l, :]
+        Z_train[i, :] = np.delete(Z, np.arange(i * l, (i + 1) * l, 1, int), axis=0)
+        Z_test[i, :] = Z[i * l:(i + 1) * l]
     X_train = np.transpose(X_train, (1, 2, 0))
     X_test = np.transpose(X_test, (1, 2, 0))
     Z_train = np.transpose(Z_train, (1, 0))
@@ -97,22 +97,22 @@ def err_from_var(var, ssize):
     return 1.97 * np.sqrt(var) / np.sqrt(ssize)
 
 
-def train(deg, cross_validation=1, bootstraps=0):
+def train(deg, cross_validation=1, bootstraps=0, solver="ols", l=1):
     X_train, X_test, Z_train, Z_test = create_data(deg, cross_validation)
     testRs = np.zeros(shape=cross_validation)
     testMs = np.zeros(shape=cross_validation)
     trainRs = np.zeros(shape=cross_validation)
     trainMs = np.zeros(shape=cross_validation)
     for i in range(cross_validation):
-        beta, var = solve_lin_equ(Z_train[:, i].flatten(), X_train[:, :, i])
+        beta, var = solve_lin_equ(Z_train[:, i].flatten(), X_train[:, :, i], solver=solver, l=l)
         err = err_from_var(var, len(Z_train[:, i]))
         if bootstraps > 0:
-            L = X_test.shape[0]
-            inds = np.random.randint(0, high=L, size=bootstraps)
-            testx = X_test[inds, :, i]
-            trainx = X_train[inds, :, i]
-            testz = Z_test[inds, i]
-            trainz = Z_train[inds, i]
+            trainL = X_train.shape[0]
+            trainInds = np.random.randint(0, high=trainL, size=bootstraps)
+            trainx = X_train[trainInds, :, i]
+            trainz = Z_train[trainInds, i]
+            testx = X_test[:, :, i]
+            testz = Z_test[:, i]
         else:
             testx = X_test[:, :, i]
             trainx = X_train[:, :, i]
@@ -130,10 +130,10 @@ def train(deg, cross_validation=1, bootstraps=0):
 
 
 def maxMatLen(maxdeg):
-    return int((maxdeg+2)*(maxdeg+1)/2)
+    return int((maxdeg + 2) * (maxdeg + 1) / 2)
 
 
-def train_degs(maxdeg, cross_validation=1, bootstraps=0):
+def train_degs(maxdeg, cross_validation=1, bootstraps=0, solver="ols", l=1):
     beta = np.zeros(shape=(maxdeg, maxMatLen(maxdeg)))
     var = np.zeros(shape=(maxdeg, maxMatLen(maxdeg)))
     err = np.zeros(shape=(maxdeg, maxMatLen(maxdeg)))
@@ -142,7 +142,8 @@ def train_degs(maxdeg, cross_validation=1, bootstraps=0):
     test_M = np.zeros(shape=(maxdeg, 1))
     train_M = np.zeros(shape=(maxdeg, 1))
     for i in range(maxdeg):
-        t = train(i+1, cross_validation=cross_validation, bootstraps=bootstraps)
+        t = train(i + 1, cross_validation=cross_validation, bootstraps=bootstraps, solver=solver,
+                  l=l)
         b = t[0]
         beta[i, 0:len(b)] = b
         v = t[1]
@@ -153,22 +154,24 @@ def train_degs(maxdeg, cross_validation=1, bootstraps=0):
         train_R[i] = t[4]
         test_M[i] = t[5]
         train_M[i] = t[6]
-    return test_R, train_R, test_M, train_M, beta, var, err
+    return test_R.ravel(), train_R.ravel(), test_M.ravel(), train_M.ravel(), beta, var, err
 
 
-def print_errors(deg, errors, labels, name, log=False):
+def print_errors(x_values, errors, labels, name, logy=False, logx=False):
     fig = plt.figure(figsize=(8, 8), dpi=300)
-    x_values = np.linspace(1, deg, deg)
+    x_values = x_values
     for i in range(len(errors)):
         plt.plot(x_values, errors[i], label=labels[i])
     plt.legend()
     ax = fig.gca()
     ax.set_xlabel("Degree")
     ax.set_ylabel("error value")
-    plt.xticks(range(1, deg+1))
-    if log:
+    if logy:
         plt.yscale('log')
-    fig.savefig("images/"+name+".png", dpi=300)
+    if logx:
+        plt.xscale('log')
+    fig.savefig("images/" + name + ".png", dpi=300)
+    return plt
 
 
 def print_cont(deg, data, name):
@@ -181,7 +184,7 @@ def print_cont(deg, data, name):
     ax.set_xlabel("Parameter Index")
     ax.set_ylabel("Polynomial Degree")
     ax.set_zlabel(name + " value")
-    fig.savefig("images/"+name+".png", dpi=300)
+    fig.savefig("images/" + name + ".png", dpi=300)
 
 
 def task_a():
@@ -192,7 +195,7 @@ def task_a():
     print_cont(deg, np.nan_to_num(np.divide(err, beta), nan=0), "errorByBeta")
     errors = [test_M, train_M, test_R, train_R]
     labels = ["test MSE", "train MSE", "test R^2", "train R^2"]
-    print_errors(deg, errors, labels, "errors")
+    print_errors(np.linspace(1, deg, deg), errors, labels, "errors")
 
 
 def task_b():
@@ -200,34 +203,60 @@ def task_b():
     test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg)
     errors = [test_M, train_M]
     labels = ["test MSE", "train MSE"]
-    print_errors(deg, errors, labels, "errors_highdeg", True)
-    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg, bootstraps=40)
+    print_errors(np.linspace(1, deg, deg), errors, labels, "errors_highdeg", True)
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg, bootstraps=400)
     errors = [test_M, train_M]
     labels = ["test MSE", "train MSE"]
-    print_errors(deg, errors, labels, "errors_highdeg_bootstrap", True)
+    print_errors(np.linspace(1, deg, deg), errors, labels, "errors_highdeg_bootstrap", True)
 
 
 def task_c():
     cross_validation = CROSS_VALIDATION
     deg = MAX_DEG
-    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg, cross_validation=cross_validation)
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg,
+                                                                  cross_validation=cross_validation)
     errors = [test_M, train_M]
     labels = ["test MSE", "train MSE"]
-    print_errors(deg, errors, labels, "errors_highdeg_crossvalidation", True)
+    print_errors(np.linspace(1, deg, deg), errors, labels, "errors_highdeg_crossvalidation", True)
 
 
-NOISE_LEVEL = 0.2
+def task_d():
+    deg = 5
+    order = np.array([-4, 10])
+    N = int(np.linalg.norm(order, 1)*50)
+    test_R = np.zeros(shape=(deg, N))
+    train_R = np.zeros(shape=(deg, N))
+    test_M = np.zeros(shape=(deg, N))
+    train_M = np.zeros(shape=(deg, N))
+    lambdas = np.logspace(order[0], order[1], num=N)
+    i = 0
+    for l in lambdas:
+        test_R[:, i], train_R[:, i], test_M[:, i], train_M[:, i], beta, var, err = train_degs(
+            maxdeg=deg, cross_validation=5, bootstraps=1000, solver="ridge", l=l)
+        i = i + 1
+    errors = np.array([test_M, train_M])
+    labels = []
+    for i in range(deg):
+        labels.extend(["test MSE"+str(i+1), "train MSE"+str(i+1)])
+    print_errors(np.tile(lambdas.transpose(), (deg, 1)).transpose(), errors.transpose((0, 2, 1)),
+                 labels,
+                 "errors_ridge",
+                 True,
+                 True)
+
+
+NOISE_LEVEL = 0.5
 MAX_DEG = 25
-RESOLUTION = .05
+RESOLUTION = .10
 RANDOM_SEED = 1337
 CROSS_VALIDATION = 5
 
 np.random.seed(RANDOM_SEED)
-#plot_franke()
+# plot_franke()
 SCALE_DATA = False
-#task_a()
+# task_a()
 SCALE_DATA = True
-task_b()
-task_c()
-
+#task_b()
+#task_c()
+task_d()
 X_train, X_test, Z_train, Z_test = create_data(2, 1)
