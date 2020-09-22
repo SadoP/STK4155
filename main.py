@@ -168,14 +168,14 @@ def train_degs(maxdeg, cross_validation=1, bootstraps=0, solver="ols", l=1):
     return test_R.ravel(), train_R.ravel(), test_M.ravel(), train_M.ravel(), beta, var, err
 
 
-def print_errors(x_values, errors, labels, name, logy=False, logx=False):
+def print_errors(x_values, errors, labels, name, logy=False, logx=False, xlabel="Degree"):
     fig = plt.figure(figsize=(8, 8), dpi=300)
     x_values = x_values
     for i in range(len(errors)):
         plt.plot(x_values, errors[i], label=labels[i])
     plt.legend()
     ax = fig.gca()
-    ax.set_xlabel("Degree")
+    ax.set_xlabel(xlabel)
     ax.set_ylabel("error value")
     if logy:
         plt.yscale('log')
@@ -234,7 +234,7 @@ def task_c():
 def task_d():
     deg = 5
     order = np.array([-4, 10])
-    N = int(np.linalg.norm(order, 1)*50)
+    N = int(np.linalg.norm(order, 1)*5)
     test_R = np.zeros(shape=(deg, N))
     train_R = np.zeros(shape=(deg, N))
     test_M = np.zeros(shape=(deg, N))
@@ -245,40 +245,43 @@ def task_d():
         test_R[:, i], train_R[:, i], test_M[:, i], train_M[:, i], beta, var, err = train_degs(
             maxdeg=deg, cross_validation=5, bootstraps=1000, solver="ridge", l=l)
         i = i + 1
-    errors = np.array([test_M, train_M])
-    labels = []
+    errors = np.append(test_M, train_M, axis=0)
+    labels = [[], []]
     for i in range(deg):
-        labels.extend(["test MSE"+str(i+1), "train MSE"+str(i+1)])
-    print_errors(np.tile(lambdas.transpose(), (deg, 1)).transpose(), errors.transpose((0, 2, 1)),
-                 labels,
-                 "errors_ridge",
-                 True,
-                 True)
+        labels[0].extend(["test MSE" + str(i + 1)])
+        labels[1].extend(["train MSE" + str(i + 1)])
+    labels = [item for sublist in labels for item in sublist]
+    print_errors(lambdas, errors, labels, "errors_ridge", True, True, xlabel="lambda")
 
 
 def task_e():
     deg = 5
-    order = np.array([-3, 1])
+    order = np.array([-3, 0])
     N = int(np.linalg.norm(order, 1) * 50)
+    lambdas = np.logspace(order[0], order[1], num=N)
     test_R = np.zeros(shape=(deg, N))
     train_R = np.zeros(shape=(deg, N))
     test_M = np.zeros(shape=(deg, N))
     train_M = np.zeros(shape=(deg, N))
-    lambdas = np.logspace(order[0], order[1], num=N)
     i = 0
     for l in lambdas:
         test_R[:, i], train_R[:, i], test_M[:, i], train_M[:, i], beta, var, err = train_degs(
-            maxdeg=deg, cross_validation=5, bootstraps=1000, solver="lasso", l=l)
+            maxdeg=deg, cross_validation=CROSS_VALIDATION, solver="lasso", l=l)
         i = i + 1
-    errors = np.array([test_M, train_M])
-    labels = []
+    errors = np.append(test_M, train_M, axis=0)
+    labels = [[], []]
     for i in range(deg):
-        labels.extend(["test MSE" + str(i + 1), "train MSE" + str(i + 1)])
-    print_errors(np.tile(lambdas.transpose(), (deg, 1)).transpose(), errors.transpose((0, 2, 1)),
-                 labels,
-                 "errors_lasso",
-                 True,
-                 True)
+        labels[0].extend(["test MSE" + str(i + 1)])
+        labels[1].extend(["train MSE" + str(i + 1)])
+    labels = [item for sublist in labels for item in sublist]
+    #https://stackoverflow.com/a/952952
+    print_errors(lambdas, errors, labels, "errors_lasso_crossvalidation", True, True, xlabel="lambda")
+    deg = MAX_DEG
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(maxdeg=deg, bootstraps=400,
+                                                                  solver="lasso", l=BEST_L)
+    errors = [test_M, train_M]
+    labels = ["test MSE", "train MSE"]
+    print_errors(np.linspace(1, deg, deg), errors, labels, "errors_highdeg_lasso", True)
 
 
 NOISE_LEVEL = 0.1
@@ -286,13 +289,14 @@ MAX_DEG = 25
 RESOLUTION = .05
 RANDOM_SEED = 1337
 CROSS_VALIDATION = 5
+BEST_L = 1e-2
 
 np.random.seed(RANDOM_SEED)
 # plot_franke()
 SCALE_DATA = False
-task_a()
+#task_a()
 SCALE_DATA = True
 #task_b()
 #task_c()
 #task_d()
-#task_e()
+task_e()
