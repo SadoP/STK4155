@@ -1,9 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from imageio import imread
 from sklearn import linear_model
-from sklearn.model_selection import train_test_split
-from sklearn import linear_model
-from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import scale
 from sklearn.utils import shuffle
 import colormaps as cmaps
@@ -37,9 +35,9 @@ def coords_to_polynomial(x, y, p):
     y = y.flatten()
     X = np.zeros(shape=(len(x), maxMatLen(p)))
     k = 0
-    for i in range(p+1):
-        for j in range(i+1):
-            X[:, k] = x**(i-j)*y**(j)
+    for i in range(p + 1):
+        for j in range(i + 1):
+            X[:, k] = x ** (i - j) * y ** (j)
             k += 1
     return X
 
@@ -66,18 +64,21 @@ def create_grid(res):
     return x, y
 
 
-def create_data(deg, cross_validation=1):
-    x, y = create_grid(RESOLUTION)
+def create_data(deg, cross_validation=1, x=None, y=None, Z=None):
+    if x is None or y is None:
+        x, y = create_grid(RESOLUTION)
+        Z = franke(x, y, NOISE_LEVEL).flatten()
     X = coords_to_polynomial(x, y, deg)
-    Z = franke(x, y, NOISE_LEVEL).flatten()
     if SCALE_DATA:
         X = scale(X, axis=1)
+    if Z is None:
+        Z = franke(x, y, NOISE_LEVEL).flatten()
     n = int(X.shape[0])
     m = int(X.shape[1])
     if cross_validation == 1:
         k = 1
         l = int(np.floor(n * 0.2))
-        train_l = int(np.floor(n * 0.8))
+        train_l = n - l
     else:
         k = int(cross_validation)
         l = int(np.floor(n / k))
@@ -108,8 +109,8 @@ def err_from_var(var, ssize):
     return 1.97 * np.sqrt(var) / np.sqrt(ssize)
 
 
-def train(deg, cross_validation=1, bootstraps=0, solver="ols", l=1):
-    X_train, X_test, Z_train, Z_test = create_data(deg, cross_validation)
+def train(deg, cross_validation=1, bootstraps=0, solver="ols", l=1, x=None, y=None, Z=None):
+    X_train, X_test, Z_train, Z_test = create_data(deg, cross_validation, x=x, y=y, Z=Z)
     testRs = np.zeros(shape=cross_validation)
     testMs = np.zeros(shape=cross_validation)
     trainRs = np.zeros(shape=cross_validation)
@@ -144,7 +145,7 @@ def maxMatLen(maxdeg):
     return int((maxdeg + 2) * (maxdeg + 1) / 2)
 
 
-def train_degs(maxdeg, cross_validation=1, bootstraps=0, solver="ols", l=1):
+def train_degs(maxdeg, cross_validation=1, bootstraps=0, solver="ols", l=1, x=None, y=None, Z=None):
     beta = np.zeros(shape=(maxdeg, maxMatLen(maxdeg)))
     var = np.zeros(shape=(maxdeg, maxMatLen(maxdeg)))
     err = np.zeros(shape=(maxdeg, maxMatLen(maxdeg)))
@@ -154,7 +155,7 @@ def train_degs(maxdeg, cross_validation=1, bootstraps=0, solver="ols", l=1):
     train_M = np.zeros(shape=(maxdeg, 1))
     for i in range(maxdeg):
         t = train(i + 1, cross_validation=cross_validation, bootstraps=bootstraps, solver=solver,
-                  l=l)
+                  l=l, x=x, y=y, Z=Z)
         b = t[0]
         beta[i, 0:len(b)] = b
         v = t[1]
@@ -198,6 +199,31 @@ def print_cont(deg, data, name):
     fig.savefig("images/" + name + ".png", dpi=300)
 
 
+def read_terrain_file():
+    terrain_file = TERRAIN_FILE
+    return imread(terrain_file)
+
+
+def get_terrain_data():
+    Z = read_terrain_file()
+    s = Z.shape
+    x = np.arange(0, s[1], 1)
+    y = np.arange(0, s[0], 1)
+    x, y = np.meshgrid(x, y)
+    return x, y, Z.flatten()
+
+
+def print_terrain_data():
+    terrain = read_terrain_file()
+    fig = plt.figure(figsize=(8, 8), dpi=300)
+    ax = fig.gca()
+    ax.set_title('Terrain over Norway 1')
+    plt.imshow(terrain, cmap='gray')
+    ax.set_xlabel("X")
+    ax.set_xlabel("Y")
+    fig.savefig("images/terrain.png", dpi=300)
+
+
 def task_a():
     deg = 5
     test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg)
@@ -234,7 +260,7 @@ def task_c():
 def task_d():
     deg = 5
     order = np.array([-4, 10])
-    N = int(np.linalg.norm(order, 1)*5)
+    N = int(np.linalg.norm(order, 1) * 5)
     test_R = np.zeros(shape=(deg, N))
     train_R = np.zeros(shape=(deg, N))
     test_M = np.zeros(shape=(deg, N))
@@ -274,8 +300,9 @@ def task_e():
         labels[0].extend(["test MSE" + str(i + 1)])
         labels[1].extend(["train MSE" + str(i + 1)])
     labels = [item for sublist in labels for item in sublist]
-    #https://stackoverflow.com/a/952952
-    print_errors(lambdas, errors, labels, "errors_lasso_crossvalidation", True, True, xlabel="lambda")
+    # https://stackoverflow.com/a/952952
+    print_errors(lambdas, errors, labels, "errors_lasso_crossvalidation", True, True,
+                 xlabel="lambda")
     deg = MAX_DEG
     test_R, train_R, test_M, train_M, beta, var, err = train_degs(maxdeg=deg, bootstraps=400,
                                                                   solver="lasso", l=BEST_L)
@@ -284,19 +311,40 @@ def task_e():
     print_errors(np.linspace(1, deg, deg), errors, labels, "errors_highdeg_lasso", True)
 
 
+def task_f():
+    # print_terrain_data()
+    deg = 3
+    x, y, Z = get_terrain_data()
+    beta, var, err, test_R, train_R, test_M, train_M = train_degs(maxdeg=deg, cross_validation=1,
+                                                                  bootstraps=0,
+                                                                  solver="ridge", l=1, x=x, y=y,
+                                                                  Z=Z)
+    print(test_R.shape)
+    print(train_R.shape)
+    errors = np.append(test_M, train_M, axis=0)
+    labels = [[], []]
+    for i in range(deg):
+        labels[0].extend(["test MSE" + str(i + 1)])
+        labels[1].extend(["train MSE" + str(i + 1)])
+    labels = [item for sublist in labels for item in sublist]
+    print_errors(np.linspace(1, deg, deg), errors, labels, "errors_terrain_data", logy=True)
+
+
 NOISE_LEVEL = 0.1
 MAX_DEG = 25
 RESOLUTION = .05
 RANDOM_SEED = 1337
 CROSS_VALIDATION = 5
 BEST_L = 1e-2
+TERRAIN_FILE = "terrain_data.tif"
 
 np.random.seed(RANDOM_SEED)
 # plot_franke()
 SCALE_DATA = False
-#task_a()
+# task_a()
 SCALE_DATA = True
-#task_b()
-#task_c()
-#task_d()
-task_e()
+# task_b()
+# task_c()
+# task_d()
+# task_e()
+task_f()
