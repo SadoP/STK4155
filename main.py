@@ -35,9 +35,13 @@ def coords_to_polynomial(x, y, p):
         return
     x = x.flatten()
     y = y.flatten()
-    X = np.array([x, y]).transpose()
-    poly = PolynomialFeatures(p)
-    return poly.fit_transform(X)
+    X = np.zeros(shape=(len(x), maxMatLen(p)))
+    k = 0
+    for i in range(p+1):
+        for j in range(i+1):
+            X[:, k] = x**(i-j)*y**(j)
+            k += 1
+    return X
 
 
 def solve_lin_equ(y, x, solver="ols", l=1):
@@ -277,19 +281,18 @@ def task_e():
                  True)
 
 
-NOISE_LEVEL = 0.5
+NOISE_LEVEL = 0.1
 MAX_DEG = 25
-RESOLUTION = .10
+RESOLUTION = .05
 RANDOM_SEED = 1337
 CROSS_VALIDATION = 5
 
 np.random.seed(RANDOM_SEED)
 # plot_franke()
 SCALE_DATA = False
-# task_a()
+task_a()
 SCALE_DATA = True
 #task_b()
 #task_c()
 #task_d()
-task_e()
-#X_train, X_test, Z_train, Z_test = create_data(2, 1)
+#task_e()
