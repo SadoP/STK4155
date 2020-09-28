@@ -5,6 +5,7 @@ from sklearn import linear_model
 from sklearn.preprocessing import scale
 from sklearn.utils import shuffle
 import colormaps as cmaps
+import pandas as pd
 
 
 def franke(x, y, noise_level):
@@ -154,6 +155,7 @@ def train_degs(maxdeg, cross_validation=1, bootstraps=0, solver="ols", l=1, x=No
     test_M = np.zeros(shape=(maxdeg, 1))
     train_M = np.zeros(shape=(maxdeg, 1))
     for i in range(maxdeg):
+        print("training degree: " + str(i + 1))
         t = train(i + 1, cross_validation=cross_validation, bootstraps=bootstraps, solver=solver,
                   l=l, x=x, y=y, Z=Z)
         b = t[0]
@@ -173,7 +175,12 @@ def print_errors(x_values, errors, labels, name, logy=False, logx=False, xlabel=
     fig = plt.figure(figsize=(8, 8), dpi=300)
     x_values = x_values
     for i in range(len(errors)):
-        plt.plot(x_values, errors[i], label=labels[i])
+        label = labels[i]
+        if label.__contains__("train"):
+            linestyle = "--"
+        else:
+            linestyle = "-"
+        plt.plot(x_values, errors[i], label=labels[i], linestyle=linestyle)
     plt.legend()
     ax = fig.gca()
     ax.set_xlabel(xlabel)
@@ -199,29 +206,46 @@ def print_cont(deg, data, name):
     fig.savefig("images/" + name + ".png", dpi=300)
 
 
-def read_terrain_file():
-    terrain_file = TERRAIN_FILE
-    return imread(terrain_file)
+def read_data_file():
+    data_file = DATA_FILE
+    return pd.read_csv(data_file, delimiter=",")
 
 
-def get_terrain_data():
-    Z = read_terrain_file()
-    s = Z.shape
-    x = np.arange(0, s[1], 1)
-    y = np.arange(0, s[0], 1)
-    x, y = np.meshgrid(x, y)
-    return x, y, Z.flatten()
+def get_data():
+    """
+    I used some data that I had left over from my previous position. This is calculated magnetic
+    field data from some permanent magnet configuration. The data does not follow a strictly
+    integer-polynomial trend but can be described not too badly by a polynom within the boundaries.
+    I made the data more sparse be removing 90% of the original data and adding some noise onto
+    the Z-values.
+    :return:
+    """
+    data = read_data_file()
+    x = np.array(data["x"])
+    y = np.array(data["y"])
+    Z = np.array(data["B"])
+    cutoff = int(np.floor(len(Z)*0.2))
+    print(cutoff)
+    print(x.shape)
+    x, y, Z = shuffle(x, y, Z, random_state=RANDOM_SEED)
+    x = x[:cutoff]
+    y = y[:cutoff]
+    Z = Z[:cutoff]
+    Z = Z*np.random.normal(0, 1, Z.shape)*NOISE_LEVEL
+    Z = Z / np.max(Z)
+    print(x.shape)
+    return x, y, Z
 
 
-def print_terrain_data():
-    terrain = read_terrain_file()
+def print_data():
+    x, y, Z = get_data()
     fig = plt.figure(figsize=(8, 8), dpi=300)
-    ax = fig.gca()
-    ax.set_title('Terrain over Norway 1')
-    plt.imshow(terrain, cmap='gray')
-    ax.set_xlabel("X")
-    ax.set_xlabel("Y")
-    fig.savefig("images/terrain.png", dpi=300)
+    ax = fig.gca(projection='3d')
+    ax.scatter(x, y, Z, c='y', marker='o')
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("B")
+    fig.savefig("images/data.png", dpi=300)
 
 
 def task_a():
@@ -241,7 +265,7 @@ def task_b():
     errors = [test_M, train_M]
     labels = ["test MSE", "train MSE"]
     print_errors(np.linspace(1, deg, deg), errors, labels, "errors_highdeg", True)
-    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg, bootstraps=400)
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg, bootstraps=BOOTSTRAPS)
     errors = [test_M, train_M]
     labels = ["test MSE", "train MSE"]
     print_errors(np.linspace(1, deg, deg), errors, labels, "errors_highdeg_bootstrap", True)
@@ -269,7 +293,7 @@ def task_d():
     i = 0
     for l in lambdas:
         test_R[:, i], train_R[:, i], test_M[:, i], train_M[:, i], beta, var, err = train_degs(
-            maxdeg=deg, cross_validation=5, bootstraps=1000, solver="ridge", l=l)
+            maxdeg=deg, cross_validation=CROSS_VALIDATION, bootstraps=BOOTSTRAPS, solver="ridge", l=l)
         i = i + 1
     errors = np.append(test_M, train_M, axis=0)
     labels = [[], []]
@@ -312,22 +336,83 @@ def task_e():
 
 
 def task_f():
-    # print_terrain_data()
-    deg = 3
-    x, y, Z = get_terrain_data()
-    beta, var, err, test_R, train_R, test_M, train_M = train_degs(maxdeg=deg, cross_validation=1,
+    #print_data()
+    x, y, Z = get_data()
+    """
+    deg = 25
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(maxdeg=deg, cross_validation=1,
                                                                   bootstraps=0,
-                                                                  solver="ridge", l=1, x=x, y=y,
+                                                                  solver="ols", l=1, x=x, y=y,
                                                                   Z=Z)
-    print(test_R.shape)
-    print(train_R.shape)
+    print_errors(np.linspace(1, deg, deg), np.array([test_M, train_M]), ["test MSE",
+                                                                         "train MSE"],
+                 "mse_custom_data_ols", logy=True)
+    print_errors(np.linspace(1, deg, deg), np.array([test_R, train_R]), ["test R^2",
+                                                                         "train R^2"],
+                 "r_squared_custom_data_ols", logy=True)
+    """
+
+    deg = 7
+    order = np.array([-5, 10])
+    N = int(np.linalg.norm(order, 1) * 3)
+    test_R = np.zeros(shape=(deg, N))
+    train_R = np.zeros(shape=(deg, N))
+    test_M = np.zeros(shape=(deg, N))
+    train_M = np.zeros(shape=(deg, N))
+    lambdas = np.logspace(order[0], order[1], num=N)
+    i = 0
+    for l in lambdas:
+        print(l)
+        test_R[:, i], train_R[:, i], test_M[:, i], train_M[:, i], beta, var, err = train_degs(
+            maxdeg=deg, cross_validation=1, bootstraps=0, solver="ridge", l=l, x=x, y=y, Z=Z)
+        i = i + 1
     errors = np.append(test_M, train_M, axis=0)
     labels = [[], []]
     for i in range(deg):
         labels[0].extend(["test MSE" + str(i + 1)])
         labels[1].extend(["train MSE" + str(i + 1)])
     labels = [item for sublist in labels for item in sublist]
-    print_errors(np.linspace(1, deg, deg), errors, labels, "errors_terrain_data", logy=True)
+    print_errors(lambdas, errors, labels, "mse_custom_data_ridge", True, True,
+                 xlabel="lambda")
+    errors = np.append(test_R, train_R, axis=0)
+    labels = [[], []]
+    for i in range(deg):
+        labels[0].extend(["test R^2 " + str(i + 1)])
+        labels[1].extend(["train R^2 " + str(i + 1)])
+    labels = [item for sublist in labels for item in sublist]
+    print_errors(lambdas, errors, labels, "r_squared_custom_data_ridge", True, True,
+                 xlabel="lambda")
+
+    deg = 7
+    order = np.array([-7, -2])
+    N = int(np.linalg.norm(order, 1) * 3)
+    test_R = np.zeros(shape=(deg, N))
+    train_R = np.zeros(shape=(deg, N))
+    test_M = np.zeros(shape=(deg, N))
+    train_M = np.zeros(shape=(deg, N))
+    lambdas = np.logspace(order[0], order[1], num=N)
+    i = 0
+    for l in lambdas:
+        print(l)
+        test_R[:, i], train_R[:, i], test_M[:, i], train_M[:, i], beta, var, err = train_degs(
+            maxdeg=deg, cross_validation=1, bootstraps=0, solver="lasso", l=l, x=x, y=y, Z=Z)
+        i = i + 1
+    errors = np.append(test_M, train_M, axis=0)
+    labels = [[], []]
+    for i in range(deg):
+        labels[0].extend(["test MSE" + str(i + 1)])
+        labels[1].extend(["train MSE" + str(i + 1)])
+    labels = [item for sublist in labels for item in sublist]
+    print_errors(lambdas, errors, labels, "mse_custom_data_lasso", True, True,
+                 xlabel="lambda")
+    errors = np.append(test_R, train_R, axis=0)
+    labels = [[], []]
+    for i in range(deg):
+        labels[0].extend(["test R^2 " + str(i + 1)])
+        labels[1].extend(["train R^2 " + str(i + 1)])
+    labels = [item for sublist in labels for item in sublist]
+    print_errors(lambdas, errors, labels, "r_squared_custom_data_lasso", True, True,
+                 xlabel="lambda")
 
 
 NOISE_LEVEL = 0.1
@@ -335,8 +420,9 @@ MAX_DEG = 25
 RESOLUTION = .05
 RANDOM_SEED = 1337
 CROSS_VALIDATION = 5
+BOOTSTRAPS = 400
 BEST_L = 1e-2
-TERRAIN_FILE = "terrain_data.tif"
+DATA_FILE = "files/test.csv"
 
 np.random.seed(RANDOM_SEED)
 # plot_franke()
