@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from imageio import imread
 from sklearn import linear_model
 from sklearn.preprocessing import scale
 from sklearn.utils import shuffle
@@ -216,24 +215,19 @@ def get_data():
     I used some data that I had left over from my previous position. This is calculated magnetic
     field data from some permanent magnet configuration. The data does not follow a strictly
     integer-polynomial trend but can be described not too badly by a polynom within the boundaries.
-    I made the data more sparse be removing 90% of the original data and adding some noise onto
-    the Z-values.
+    I made the data more sparse by randomly removing 80% of the original data.
     :return:
     """
     data = read_data_file()
     x = np.array(data["x"])
     y = np.array(data["y"])
     Z = np.array(data["B"])
-    cutoff = int(np.floor(len(Z)*0.2))
-    print(cutoff)
-    print(x.shape)
+    cutoff = int(np.floor(len(Z)*.2))
     x, y, Z = shuffle(x, y, Z, random_state=RANDOM_SEED)
     x = x[:cutoff]
     y = y[:cutoff]
     Z = Z[:cutoff]
-    Z = Z*np.random.normal(0, 1, Z.shape)*NOISE_LEVEL
     Z = Z / np.max(Z)
-    print(x.shape)
     return x, y, Z
 
 
@@ -338,8 +332,8 @@ def task_e():
 def task_f():
     #print_data()
     x, y, Z = get_data()
-    """
-    deg = 25
+
+    deg = 35
     test_R, train_R, test_M, train_M, beta, var, err = train_degs(maxdeg=deg, cross_validation=1,
                                                                   bootstraps=0,
                                                                   solver="ols", l=1, x=x, y=y,
@@ -350,11 +344,11 @@ def task_f():
     print_errors(np.linspace(1, deg, deg), np.array([test_R, train_R]), ["test R^2",
                                                                          "train R^2"],
                  "r_squared_custom_data_ols", logy=True)
-    """
 
-    deg = 7
-    order = np.array([-5, 10])
-    N = int(np.linalg.norm(order, 1) * 3)
+
+    deg = 10
+    order = np.array([-4, 8])
+    N = int(np.linalg.norm(order, 1) * 5)
     test_R = np.zeros(shape=(deg, N))
     train_R = np.zeros(shape=(deg, N))
     test_M = np.zeros(shape=(deg, N))
@@ -383,9 +377,9 @@ def task_f():
     print_errors(lambdas, errors, labels, "r_squared_custom_data_ridge", True, True,
                  xlabel="lambda")
 
-    deg = 7
-    order = np.array([-7, -2])
-    N = int(np.linalg.norm(order, 1) * 3)
+    deg = 10
+    order = np.array([-7, 3])
+    N = int(np.linalg.norm(order, 1) * 5)
     test_R = np.zeros(shape=(deg, N))
     train_R = np.zeros(shape=(deg, N))
     test_M = np.zeros(shape=(deg, N))
