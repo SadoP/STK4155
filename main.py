@@ -170,7 +170,7 @@ def train_degs(maxdeg, cross_validation=1, bootstraps=0, solver="ols", l=1, x=No
     return test_R.ravel(), train_R.ravel(), test_M.ravel(), train_M.ravel(), beta, var, err
 
 
-def print_errors(x_values, errors, labels, name, logy=False, logx=False, xlabel="Degree"):
+def print_errors(x_values, errors, labels, name, logy=False, logx=False, xlabel="Degree", ylabel="error value"):
     fig = plt.figure(figsize=(8, 8), dpi=300)
     x_values = x_values
     for i in range(len(errors)):
@@ -183,7 +183,7 @@ def print_errors(x_values, errors, labels, name, logy=False, logx=False, xlabel=
     plt.legend()
     ax = fig.gca()
     ax.set_xlabel(xlabel)
-    ax.set_ylabel("error value")
+    ax.set_ylabel(ylabel)
     if logy:
         plt.yscale('log')
     if logx:
@@ -334,7 +334,7 @@ def task_f():
     x, y, Z = get_data()
 
     deg = 35
-    test_R, train_R, test_M, train_M, beta, var, err = train_degs(maxdeg=deg, cross_validation=1,
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(maxdeg=deg, cross_validation=CROSS_VALIDATION,
                                                                   bootstraps=0,
                                                                   solver="ols", l=1, x=x, y=y,
                                                                   Z=Z)
@@ -343,7 +343,7 @@ def task_f():
                  "mse_custom_data_ols", logy=True)
     print_errors(np.linspace(1, deg, deg), np.array([test_R, train_R]), ["test R^2",
                                                                          "train R^2"],
-                 "r_squared_custom_data_ols", logy=True)
+                 "r_squared_custom_data_ols", logy=True, ylabel="R^2")
 
 
     deg = 10
@@ -358,7 +358,7 @@ def task_f():
     for l in lambdas:
         print(l)
         test_R[:, i], train_R[:, i], test_M[:, i], train_M[:, i], beta, var, err = train_degs(
-            maxdeg=deg, cross_validation=1, bootstraps=0, solver="ridge", l=l, x=x, y=y, Z=Z)
+            maxdeg=deg, cross_validation=CROSS_VALIDATION, bootstraps=0, solver="ridge", l=l, x=x, y=y, Z=Z)
         i = i + 1
     errors = np.append(test_M, train_M, axis=0)
     labels = [[], []]
@@ -375,7 +375,7 @@ def task_f():
         labels[1].extend(["train R^2 " + str(i + 1)])
     labels = [item for sublist in labels for item in sublist]
     print_errors(lambdas, errors, labels, "r_squared_custom_data_ridge", True, True,
-                 xlabel="lambda")
+                 xlabel="lambda", ylabel="R^2")
 
     deg = 10
     order = np.array([-7, 3])
@@ -389,7 +389,7 @@ def task_f():
     for l in lambdas:
         print(l)
         test_R[:, i], train_R[:, i], test_M[:, i], train_M[:, i], beta, var, err = train_degs(
-            maxdeg=deg, cross_validation=1, bootstraps=0, solver="lasso", l=l, x=x, y=y, Z=Z)
+            maxdeg=deg, cross_validation=CROSS_VALIDATION, bootstraps=0, solver="lasso", l=l, x=x, y=y, Z=Z)
         i = i + 1
     errors = np.append(test_M, train_M, axis=0)
     labels = [[], []]
@@ -406,7 +406,7 @@ def task_f():
         labels[1].extend(["train R^2 " + str(i + 1)])
     labels = [item for sublist in labels for item in sublist]
     print_errors(lambdas, errors, labels, "r_squared_custom_data_lasso", True, True,
-                 xlabel="lambda")
+                 xlabel="lambda", ylabel="R^2")
 
 
 NOISE_LEVEL = 0.1
