@@ -5,7 +5,7 @@ from sklearn.preprocessing import scale
 from sklearn.utils import shuffle
 import colormaps as cmaps
 import pandas as pd
-
+from matplotlib import rcParams
 
 def franke(x, y, noise_level):
     if x.any() < 0 or x.any() > 1 or y.any() < 0 or y.any() > 1:
@@ -54,7 +54,7 @@ def solve_lin_equ(y, x, solver="ols", l=1):
         clf.fit(x, y)
         beta = clf.coef_
         var = np.zeros(shape=(1, 1))
-    return beta, var.diagonal()
+    return beta, np.abs(var.diagonal())
 
 
 def create_grid(res):
@@ -170,8 +170,9 @@ def train_degs(maxdeg, cross_validation=1, bootstraps=0, solver="ols", l=1, x=No
     return test_R.ravel(), train_R.ravel(), test_M.ravel(), train_M.ravel(), beta, var, err
 
 
-def print_errors(x_values, errors, labels, name, logy=False, logx=False, xlabel="Degree", ylabel="error value"):
-    fig = plt.figure(figsize=(8, 8), dpi=300)
+def print_errors(x_values, errors, labels, name, logy=False, logx=False, xlabel="Degree",
+                 ylabel="error value", d=4):
+    fig = plt.figure(figsize=(d, d), dpi=300)
     x_values = x_values
     for i in range(len(errors)):
         label = labels[i]
@@ -188,20 +189,22 @@ def print_errors(x_values, errors, labels, name, logy=False, logx=False, xlabel=
         plt.yscale('log')
     if logx:
         plt.xscale('log')
+    fig.tight_layout()
     fig.savefig("images/" + name + ".png", dpi=300)
     return plt
 
 
-def print_cont(deg, data, name):
+def print_cont(deg, data, name, zlabel):
     x = np.linspace(1, maxMatLen(deg), maxMatLen(deg))
     y = np.linspace(1, deg, deg)
     x, y = np.meshgrid(x, y)
-    fig = plt.figure(figsize=(8, 8), dpi=300)
+    fig = plt.figure(figsize=(6, 6), dpi=300)
     ax = fig.gca(projection='3d')
     ax.plot_surface(x, y, data, cmap=cmaps.parula)
     ax.set_xlabel("Parameter Index")
     ax.set_ylabel("Polynomial Degree")
-    ax.set_zlabel(name + " value")
+    ax.set_zlabel(zlabel)
+    fig.tight_layout()
     fig.savefig("images/" + name + ".png", dpi=300)
 
 
@@ -245,12 +248,18 @@ def print_data():
 def task_a():
     deg = 5
     test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg)
-    print_cont(deg, err, "error")
-    print_cont(deg, beta, "betas")
-    print_cont(deg, np.nan_to_num(np.divide(err, beta), nan=0), "errorByBeta")
-    errors = [test_M, train_M, test_R, train_R]
-    labels = ["test MSE", "train MSE", "test R^2", "train R^2"]
-    print_errors(np.linspace(1, deg, deg), errors, labels, "errors")
+    print_cont(deg, err, "a/ols_error_scaling_"+SCALE_DATA.__str__(), "Parameter error")
+    print_cont(deg, beta, "a/ols_betas_scaling_"+SCALE_DATA.__str__(), "Parameter values")
+    errors = [test_M, train_M]
+    labels = ["test MSE", "train MSE"]
+    print_errors(np.linspace(1, deg, deg), errors, labels,
+                 "a/ols_mse_scaling_"+SCALE_DATA.__str__(),
+                 logy=True, ylabel="mean squared error")
+    errors = [test_R, train_R]
+    labels = ["test R^2", "train R^2"]
+    print_errors(np.linspace(1, deg, deg), errors, labels,
+                 "a/ols_R_squared_scaling_"+SCALE_DATA.__str__(),
+                 ylabel="R^2 value")
 
 
 def task_b():
@@ -258,26 +267,45 @@ def task_b():
     test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg)
     errors = [test_M, train_M]
     labels = ["test MSE", "train MSE"]
-    print_errors(np.linspace(1, deg, deg), errors, labels, "errors_highdeg", True)
+    print_errors(np.linspace(1, deg, deg), errors, labels, "b/ols_mse_highdeg_noBoot", True,
+                 ylabel="mean squared error")
     test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg, bootstraps=BOOTSTRAPS)
     errors = [test_M, train_M]
     labels = ["test MSE", "train MSE"]
-    print_errors(np.linspace(1, deg, deg), errors, labels, "errors_highdeg_bootstrap", True)
+    print_errors(np.linspace(1, deg, deg), errors, labels, "b/ols_mse_highdeg_Boot_"+str(
+        BOOTSTRAPS), True, ylabel="mean squared error")
 
 
 def task_c():
-    cross_validation = CROSS_VALIDATION
     deg = MAX_DEG
+    cross_validation = 5
     test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg,
                                                                   cross_validation=cross_validation)
     errors = [test_M, train_M]
     labels = ["test MSE", "train MSE"]
-    print_errors(np.linspace(1, deg, deg), errors, labels, "errors_highdeg_crossvalidation", True)
+    print_errors(np.linspace(1, deg, deg), errors, labels, "c/mse_highdeg_crossvalidation_" +
+                 str(cross_validation), True, ylabel="mean squared error")
+    errors = [test_R, train_R]
+    labels = ["test R^2", "train R^2"]
+    print_errors(np.linspace(1, deg, deg), errors, labels, "c/r_squared_highdeg_crossvalidation_" +
+                 str(cross_validation), True, ylabel="R^2 value")
+    cross_validation = 10
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg,
+                                                                  cross_validation=cross_validation)
+    errors = [test_M, train_M]
+    labels = ["test MSE", "train MSE"]
+    print_errors(np.linspace(1, deg, deg), errors, labels, "c/mse_highdeg_crossvalidation_"+str(
+        cross_validation), True, ylabel="mean squared error")
+    errors = [test_R, train_R]
+    labels = ["test R^2", "train R^2"]
+    print_errors(np.linspace(1, deg, deg), errors, labels, "c/r_squared_highdeg_crossvalidation_" +
+                 str(cross_validation), True, ylabel="R^2 value")
 
 
 def task_d():
-    deg = 5
-    order = np.array([-4, 10])
+    deg = 10
+    cross_validation = CROSS_VALIDATION
+    order = np.array([-7, 5])
     N = int(np.linalg.norm(order, 1) * 5)
     test_R = np.zeros(shape=(deg, N))
     train_R = np.zeros(shape=(deg, N))
@@ -287,7 +315,7 @@ def task_d():
     i = 0
     for l in lambdas:
         test_R[:, i], train_R[:, i], test_M[:, i], train_M[:, i], beta, var, err = train_degs(
-            maxdeg=deg, cross_validation=CROSS_VALIDATION, bootstraps=BOOTSTRAPS, solver="ridge", l=l)
+            maxdeg=deg, cross_validation=cross_validation, solver="ridge", l=l)
         i = i + 1
     errors = np.append(test_M, train_M, axis=0)
     labels = [[], []]
@@ -295,7 +323,58 @@ def task_d():
         labels[0].extend(["test MSE" + str(i + 1)])
         labels[1].extend(["train MSE" + str(i + 1)])
     labels = [item for sublist in labels for item in sublist]
-    print_errors(lambdas, errors, labels, "errors_ridge", True, True, xlabel="lambda")
+    print_errors(lambdas, errors, labels, "d/ridge_mse_cross_"+str(cross_validation), True, True,
+                 xlabel="lambda", d=7, ylabel="mean squared error")
+    errors = np.append(test_R, train_R, axis=0)
+    labels = [[], []]
+    for i in range(deg):
+        labels[0].extend(["test R^2 " + str(i + 1)])
+        labels[1].extend(["train R^2 " + str(i + 1)])
+    labels = [item for sublist in labels for item in sublist]
+    print_errors(lambdas, errors, labels, "d/ridge_R_squared_cross_"+str(cross_validation), True,
+                 True, xlabel="lambda", d=7, ylabel="R^2 value")
+
+    bootstraps = BOOTSTRAPS
+    test_R = np.zeros(shape=(deg, N))
+    train_R = np.zeros(shape=(deg, N))
+    test_M = np.zeros(shape=(deg, N))
+    train_M = np.zeros(shape=(deg, N))
+    lambdas = np.logspace(order[0], order[1], num=N)
+    i = 0
+    for l in lambdas:
+        test_R[:, i], train_R[:, i], test_M[:, i], train_M[:, i], beta, var, err = train_degs(
+            maxdeg=deg, bootstraps=bootstraps, solver="ridge", l=l)
+        i = i + 1
+    errors = np.append(test_M, train_M, axis=0)
+    labels = [[], []]
+    for i in range(deg):
+        labels[0].extend(["test MSE" + str(i + 1)])
+        labels[1].extend(["train MSE" + str(i + 1)])
+    labels = [item for sublist in labels for item in sublist]
+    print_errors(lambdas, errors, labels, "d/ridge_mse_boot_"+str(bootstraps), True, True,
+                 xlabel="lambda", d=7, ylabel="mean squared error")
+    errors = np.append(test_R, train_R, axis=0)
+    labels = [[], []]
+    for i in range(deg):
+        labels[0].extend(["test R^2 " + str(i + 1)])
+        labels[1].extend(["train R^2 " + str(i + 1)])
+    labels = [item for sublist in labels for item in sublist]
+    print_errors(lambdas, errors, labels, "d/ridge_R_squared_boot_"+str(bootstraps), True,
+                 True, xlabel="lambda", d=7, ylabel="R^2 value")
+
+    best_l = 1
+    deg = MAX_DEG*2
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg, bootstraps=bootstraps,
+                                                                  solver="ridge", l=best_l)
+    errors = [test_M, train_M]
+    labels = ["test MSE", "train MSE"]
+    print_errors(np.linspace(1, deg, deg), errors, labels, "d/ridge_mse_highdeg_Boot_"+str(
+        bootstraps)+"_lambda_"+str(best_l), True, ylabel="mean squared error")
+    errors = [test_R, train_R]
+    labels = ["test R^2 ", "train R^2 "]
+    print_errors(np.linspace(1, deg, deg), errors, labels, "d/ridge_R_squared_highdeg_Boot_"+str(
+        bootstraps)+"_lambda_"+str(best_l), True, ylabel="mean squared error")
+
 
 
 def task_e():
@@ -409,22 +488,45 @@ def task_f():
                  xlabel="lambda", ylabel="R^2")
 
 
+def show_cond_numbers():
+    x, y = create_grid(0.1)
+    X3 = coords_to_polynomial(x, y, 3)
+    X5 = coords_to_polynomial(x, y, 5)
+    X10 = coords_to_polynomial(x, y, 10)
+    c3 = np.linalg.cond(X3.transpose()@X3)
+    c5 = np.linalg.cond(X5.transpose()@X5)
+    c10 = np.linalg.cond(X10.transpose()@X10)
+    X3 = scale(X3, axis=1)
+    X5 = scale(X5, axis=1)
+    X10 = scale(X10, axis=1)
+    c3s = np.linalg.cond(X3.transpose()@X3)
+    c5s = np.linalg.cond(X5.transpose()@X5)
+    c10s = np.linalg.cond(X10.transpose()@X10)
+    print("condition numbers for different degress of the polynomial:\n"
+          "deg3: %f\ndeg5: %f\ndeg10:%f\nSame for centered data:\ndeg3: %f\ndeg5: %f\ndeg10:%f" % (
+          c3, c5, c10, c3s, c5s, c10s))
+
 NOISE_LEVEL = 0.1
-MAX_DEG = 25
-RESOLUTION = .05
+MAX_DEG = 30
+RESOLUTION = .02
 RANDOM_SEED = 1337
-CROSS_VALIDATION = 5
-BOOTSTRAPS = 400
+BOOTSTRAPS = 200
 BEST_L = 1e-2
 DATA_FILE = "files/test.csv"
-
 np.random.seed(RANDOM_SEED)
-# plot_franke()
+CROSS_VALIDATION = 5
+
+show_cond_numbers()
 SCALE_DATA = False
-# task_a()
+"""
+task_a()
 SCALE_DATA = True
-# task_b()
-# task_c()
-# task_d()
+task_a()
+task_b()
+"""
+SCALE_DATA = True
+#task_c()
+RESOLUTION = .1
+task_d()
 # task_e()
-task_f()
+# task_f()
