@@ -50,7 +50,7 @@ def solve_lin_equ(y, x, solver="ols", l=1):
         var = np.linalg.inv(x.transpose() @ x + l * np.identity(x.shape[1]))
         beta = var @ x.transpose() @ y
     elif solver == "lasso":
-        clf = linear_model.Lasso(alpha=l)
+        clf = linear_model.Lasso(alpha=l, max_iter=MAX_ITER)
         clf.fit(x, y)
         beta = clf.coef_
         var = np.zeros(shape=(1, 1))
@@ -322,6 +322,7 @@ def task_d():
     for i in range(deg):
         labels[0].extend(["test MSE" + str(i + 1)])
         labels[1].extend(["train MSE" + str(i + 1)])
+    # https://stackoverflow.com/a/952952
     labels = [item for sublist in labels for item in sublist]
     print_errors(lambdas, errors, labels, "d/ridge_mse_cross_"+str(cross_validation), True, True,
                  xlabel="lambda", d=7, ylabel="mean squared error")
@@ -376,20 +377,20 @@ def task_d():
         bootstraps)+"_lambda_"+str(best_l), True, ylabel="mean squared error")
 
 
-
 def task_e():
-    deg = 5
-    order = np.array([-3, 0])
-    N = int(np.linalg.norm(order, 1) * 50)
-    lambdas = np.logspace(order[0], order[1], num=N)
+    deg = 10
+    cross_validation = CROSS_VALIDATION
+    order = np.array([-4, 0])
+    N = int(np.linalg.norm(order, 1) * 10)
     test_R = np.zeros(shape=(deg, N))
     train_R = np.zeros(shape=(deg, N))
     test_M = np.zeros(shape=(deg, N))
     train_M = np.zeros(shape=(deg, N))
+    lambdas = np.logspace(order[0], order[1], num=N)
     i = 0
     for l in lambdas:
         test_R[:, i], train_R[:, i], test_M[:, i], train_M[:, i], beta, var, err = train_degs(
-            maxdeg=deg, cross_validation=CROSS_VALIDATION, solver="lasso", l=l)
+            maxdeg=deg, cross_validation=cross_validation, solver="lasso", l=l)
         i = i + 1
     errors = np.append(test_M, train_M, axis=0)
     labels = [[], []]
@@ -397,36 +398,88 @@ def task_e():
         labels[0].extend(["test MSE" + str(i + 1)])
         labels[1].extend(["train MSE" + str(i + 1)])
     labels = [item for sublist in labels for item in sublist]
-    # https://stackoverflow.com/a/952952
-    print_errors(lambdas, errors, labels, "errors_lasso_crossvalidation", True, True,
-                 xlabel="lambda")
-    deg = MAX_DEG
-    test_R, train_R, test_M, train_M, beta, var, err = train_degs(maxdeg=deg, bootstraps=400,
-                                                                  solver="lasso", l=BEST_L)
+    print_errors(lambdas, errors, labels, "e/lasso_mse_cross_"+str(cross_validation), True, True,
+                 xlabel="lambda", d=7, ylabel="mean squared error")
+    errors = np.append(test_R, train_R, axis=0)
+    labels = [[], []]
+    for i in range(deg):
+        labels[0].extend(["test R^2 " + str(i + 1)])
+        labels[1].extend(["train R^2 " + str(i + 1)])
+    labels = [item for sublist in labels for item in sublist]
+    print_errors(lambdas, errors, labels, "e/lasso_R_squared_cross_"+str(cross_validation), True,
+                 True, xlabel="lambda", d=7, ylabel="R^2 value")
+    print_errors(lambdas, errors, labels, "e/lasso_R_squared_cross_"+str(cross_validation)+"liny",
+                 logy=False, logx=True, xlabel="lambda", d=7, ylabel="R^2 value")
+
+    bootstraps = BOOTSTRAPS
+    test_R = np.zeros(shape=(deg, N))
+    train_R = np.zeros(shape=(deg, N))
+    test_M = np.zeros(shape=(deg, N))
+    train_M = np.zeros(shape=(deg, N))
+    lambdas = np.logspace(order[0], order[1], num=N)
+    i = 0
+    for l in lambdas:
+        test_R[:, i], train_R[:, i], test_M[:, i], train_M[:, i], beta, var, err = train_degs(
+            maxdeg=deg, bootstraps=bootstraps, solver="lasso", l=l)
+        i = i + 1
+    errors = np.append(test_M, train_M, axis=0)
+    labels = [[], []]
+    for i in range(deg):
+        labels[0].extend(["test MSE" + str(i + 1)])
+        labels[1].extend(["train MSE" + str(i + 1)])
+    labels = [item for sublist in labels for item in sublist]
+    print_errors(lambdas, errors, labels, "e/lasso_mse_boot_"+str(bootstraps), True, True,
+                 xlabel="lambda", d=7, ylabel="mean squared error")
+    errors = np.append(test_R, train_R, axis=0)
+    labels = [[], []]
+    for i in range(deg):
+        labels[0].extend(["test R^2 " + str(i + 1)])
+        labels[1].extend(["train R^2 " + str(i + 1)])
+    labels = [item for sublist in labels for item in sublist]
+    print_errors(lambdas, errors, labels, "e/lasso_R_squared_boot_"+str(bootstraps), True,
+                 True, xlabel="lambda", d=7, ylabel="R^2 value")
+    print_errors(lambdas, errors, labels, "e/lasso_R_squared_boot_"+str(bootstraps)+"liny",
+                 logx=True, logy=False, xlabel="lambda", d=7, ylabel="R^2 value")
+    best_l = 2e-2
+    deg = MAX_DEG*2
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg, bootstraps=bootstraps,
+                                                                  solver="lasso", l=best_l)
     errors = [test_M, train_M]
     labels = ["test MSE", "train MSE"]
-    print_errors(np.linspace(1, deg, deg), errors, labels, "errors_highdeg_lasso", True)
+    print_errors(np.linspace(1, deg, deg), errors, labels, "e/lasso_mse_highdeg_Boot_"+str(
+        bootstraps)+"_lambda_"+str(best_l), logy=True, d=7, ylabel="mean squared error")
+    errors = [test_R, train_R]
+    labels = ["test R^2 ", "train R^2 "]
+    print_errors(np.linspace(1, deg, deg), errors, labels, "e/lasso_R_squared_highdeg_Boot_"+str(
+        bootstraps)+"_lambda_"+str(best_l), d=7, ylabel="R^2 value")
+    best_l = 2e-1
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(deg, bootstraps=bootstraps,
+                                                                  solver="lasso", l=best_l)
+    errors = [test_M, train_M]
+    labels = ["test MSE", "train MSE"]
+    print_errors(np.linspace(1, deg, deg), errors, labels, "e/lasso_mse_highdeg_Boot_" + str(
+        bootstraps) + "_lambda_" + str(best_l), d=7, logy=True, ylabel="mean squared error")
+    errors = [test_R, train_R]
+    labels = ["test R^2 ", "train R^2 "]
+    print_errors(np.linspace(1, deg, deg), errors, labels, "e/lasso_R_squared_highdeg_Boot_" + str(
+        bootstraps) + "_lambda_" + str(best_l), d=7, ylabel="R^2 value")
 
 
 def task_f():
-    #print_data()
     x, y, Z = get_data()
-
-    deg = 35
+    deg = MAX_DEG
     test_R, train_R, test_M, train_M, beta, var, err = train_degs(maxdeg=deg, cross_validation=CROSS_VALIDATION,
                                                                   bootstraps=0,
                                                                   solver="ols", l=1, x=x, y=y,
                                                                   Z=Z)
     print_errors(np.linspace(1, deg, deg), np.array([test_M, train_M]), ["test MSE",
                                                                          "train MSE"],
-                 "mse_custom_data_ols", logy=True)
+                 "f/mse_custom_data_ols", d=7, logy=True)
     print_errors(np.linspace(1, deg, deg), np.array([test_R, train_R]), ["test R^2",
                                                                          "train R^2"],
-                 "r_squared_custom_data_ols", logy=True, ylabel="R^2")
-
-
+                 "f/r_squared_custom_data_ols", d=7, ylabel="R^2",logy=True)
     deg = 10
-    order = np.array([-4, 8])
+    order = np.array([-1, 7])
     N = int(np.linalg.norm(order, 1) * 5)
     test_R = np.zeros(shape=(deg, N))
     train_R = np.zeros(shape=(deg, N))
@@ -445,19 +498,19 @@ def task_f():
         labels[0].extend(["test MSE" + str(i + 1)])
         labels[1].extend(["train MSE" + str(i + 1)])
     labels = [item for sublist in labels for item in sublist]
-    print_errors(lambdas, errors, labels, "mse_custom_data_ridge", True, True,
-                 xlabel="lambda")
+    print_errors(lambdas, errors, labels, "f/mse_custom_data_ridge", logx=True, logy=True,
+                 xlabel="lambda", d=7)
     errors = np.append(test_R, train_R, axis=0)
     labels = [[], []]
     for i in range(deg):
         labels[0].extend(["test R^2 " + str(i + 1)])
         labels[1].extend(["train R^2 " + str(i + 1)])
     labels = [item for sublist in labels for item in sublist]
-    print_errors(lambdas, errors, labels, "r_squared_custom_data_ridge", True, True,
-                 xlabel="lambda", ylabel="R^2")
+    print_errors(lambdas, errors, labels, "f/r_squared_custom_data_ridge", logx=True,
+                 xlabel="lambda", ylabel="R^2", d=7)
 
     deg = 10
-    order = np.array([-7, 3])
+    order = np.array([-7, 0])
     N = int(np.linalg.norm(order, 1) * 5)
     test_R = np.zeros(shape=(deg, N))
     train_R = np.zeros(shape=(deg, N))
@@ -476,16 +529,31 @@ def task_f():
         labels[0].extend(["test MSE" + str(i + 1)])
         labels[1].extend(["train MSE" + str(i + 1)])
     labels = [item for sublist in labels for item in sublist]
-    print_errors(lambdas, errors, labels, "mse_custom_data_lasso", True, True,
-                 xlabel="lambda")
+    print_errors(lambdas, errors, labels, "f/mse_custom_data_lasso", logy=True, logx=True,
+                 xlabel="lambda", d=7)
     errors = np.append(test_R, train_R, axis=0)
     labels = [[], []]
     for i in range(deg):
         labels[0].extend(["test R^2 " + str(i + 1)])
         labels[1].extend(["train R^2 " + str(i + 1)])
     labels = [item for sublist in labels for item in sublist]
-    print_errors(lambdas, errors, labels, "r_squared_custom_data_lasso", True, True,
-                 xlabel="lambda", ylabel="R^2")
+    print_errors(lambdas, errors, labels, "f/r_squared_custom_data_lasso", logx=True,
+                 xlabel="lambda", ylabel="R^2", d=7)
+    best_l = 10
+    deg = MAX_DEG
+    test_R, train_R, test_M, train_M, beta, var, err = train_degs(maxdeg=deg,
+                                                                  cross_validation=CROSS_VALIDATION,
+                                                                  bootstraps=0, solver="ridge",
+                                                                  l=best_l, x=x, y=y, Z=Z)
+    errors = [test_M, train_M]
+    labels = ["test MSE", "train MSE"]
+    print_errors(np.linspace(1, deg, deg), errors, labels, "f/ridge_mse_highdeg_cross_" + str(
+        CROSS_VALIDATION) + "_lambda_" + str(best_l), logy=True, d=7, ylabel="mean squared error")
+    errors = [test_R, train_R]
+    labels = ["test R^2 ", "train R^2 "]
+    print_errors(np.linspace(1, deg, deg), errors, labels, "f/ridge_R_squared_highdeg_cross_" + str(
+        CROSS_VALIDATION) + "_lambda_" + str(best_l), d=7, ylabel="R^2 value")
+
 
 
 def show_cond_numbers():
@@ -506,6 +574,7 @@ def show_cond_numbers():
           "deg3: %f\ndeg5: %f\ndeg10:%f\nSame for centered data:\ndeg3: %f\ndeg5: %f\ndeg10:%f" % (
           c3, c5, c10, c3s, c5s, c10s))
 
+
 NOISE_LEVEL = 0.1
 MAX_DEG = 30
 RESOLUTION = .02
@@ -515,6 +584,7 @@ BEST_L = 1e-2
 DATA_FILE = "files/test.csv"
 np.random.seed(RANDOM_SEED)
 CROSS_VALIDATION = 5
+MAX_ITER = 100000
 
 show_cond_numbers()
 SCALE_DATA = False
@@ -526,7 +596,8 @@ task_b()
 """
 SCALE_DATA = True
 #task_c()
-RESOLUTION = .1
-task_d()
+RESOLUTION = .05
+# task_d()
 # task_e()
-# task_f()
+MAX_ITER = 1000
+task_f()
