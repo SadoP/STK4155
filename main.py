@@ -88,8 +88,7 @@ def coords_to_polynomial(x: np.array, y: np.array, p: int) -> np.array:
 
 
 def solve_lin_equ(y: np.array, x: np.array, solver: str = "ols", la: float = 1) -> Tuple[
-                                                                                         np.array,
-                                                                                         np.array]:
+        np.array, np.array]:
     """
     Solves linear equation of type y = x*beta. This can be done using ordinary least squares (OLS),
     ridge or lasso regression. For ridge and lasso, an additional parameter l for shrinkage /
@@ -467,10 +466,13 @@ def train_print_diff_lambdas(deg: int, minorder: int, maxorder: int, cross_valid
     :param y: y vector
     :param z: z vector
     :param task: task this belongs to, to sort the figures into the correct folder
+    :param d: size of the figure
     :return: None
     """
-    if task == "f" or task == "e": logy = False
-    else: logy = True
+    if task == "f" or task == "e":
+        logy = False
+    else:
+        logy = True
     order = np.array([minorder, maxorder])
     n = int(np.linalg.norm(order, 1) * 5)
     test_r = np.zeros(shape=(deg, n))
@@ -494,8 +496,8 @@ def train_print_diff_lambdas(deg: int, minorder: int, maxorder: int, cross_valid
     errors = np.append(test_m, train_m, axis=0)
     labels = [[], []]
     for i in range(deg):
-        labels[0].extend(["test MSE" + str(i + 1)])
-        labels[1].extend(["train MSE" + str(i + 1)])
+        labels[0].extend(["test deg:" + str(i + 1)])
+        labels[1].extend(["train deg:" + str(i + 1)])
     # https://stackoverflow.com/a/952952
     labels = [item for sublist in labels for item in sublist]
     # plotting mean squared error
@@ -504,11 +506,6 @@ def train_print_diff_lambdas(deg: int, minorder: int, maxorder: int, cross_valid
                      bootstraps), logx=True, logy=True,
                  xlabel="lambda", d=d, ylabel="mean squared error")
     errors = np.append(test_r, train_r, axis=0)
-    labels = [[], []]
-    for i in range(deg):
-        labels[0].extend(["test R^2 " + str(i + 1)])
-        labels[1].extend(["train R^2 " + str(i + 1)])
-    labels = [item for sublist in labels for item in sublist]
     print_errors(lambdas, errors, labels,
                  task + "/" + solver + "_R_squared_cross_" + str(cross_validation) + "_boot_" + str(
                      bootstraps), logx=True, logy=logy,
@@ -531,27 +528,29 @@ def train_print_single_lambda(deg: int, la: float = 0, cross_validation: int = 1
     :param y: y vector
     :param z: z vector
     :param task: task this belongs to, to sort the figures into the correct folder
+    :param d: size of the figure
     :return: None
     """
-    if task == "f" or task == "e": logy = False
-    else: logy = True
+    if task == "f" or task == "e":
+        logy = False
+    else:
+        logy = True
     test_r, train_r, test_m, train_m, beta, var, err = train_degs(maxdeg=deg,
                                                                   cross_validation=cross_validation,
                                                                   bootstraps=bootstraps,
                                                                   solver=solver, la=la,
                                                                   x=x, y=y, z=z)
     errors = [test_m, train_m]
-    labels = ["test MSE", "train MSE"]
+    labels = ["test", "train"]
     print_errors(np.linspace(1, deg, deg), errors, labels,
                  task + "/" + solver + "_mse_deg" + str(deg) + "_cross_" +
                  str(cross_validation) + "_Boot_" + str(bootstraps) + "_lambda_" + str(la),
                  logy=True, ylabel="mean squared error", d=d)
     errors = [test_r, train_r]
-    labels = ["test R^2 ", "train R^2 "]
     print_errors(np.linspace(1, deg, deg), errors, labels,
                  task + "/" + solver + "_R_squared_deg" + str(deg) + "_cross_" +
                  str(cross_validation) + "_Boot_" + str(bootstraps) + "_lambda_" + str(la),
-                 logy=logy, ylabel="R squared value", d=d)
+                 logy=logy, ylabel="R^2 value", d=d)
 
 
 def task_a():
@@ -560,12 +559,11 @@ def task_a():
     print_cont(deg, err, "a/ols_error_scaling_" + SCALE_DATA.__str__(), "Parameter error")
     print_cont(deg, beta, "a/ols_betas_scaling_" + SCALE_DATA.__str__(), "Parameter values")
     errors = [test_m, train_m]
-    labels = ["test MSE", "train MSE"]
+    labels = ["test", "train"]
     print_errors(np.linspace(1, deg, deg), errors, labels,
                  "a/ols_mse_scaling_" + SCALE_DATA.__str__(),
                  logy=True, ylabel="mean squared error", d=4)
     errors = [test_r, train_r]
-    labels = ["test R^2", "train R^2"]
     print_errors(np.linspace(1, deg, deg), errors, labels,
                  "a/ols_R_squared_scaling_" + SCALE_DATA.__str__(),
                  ylabel="R^2 value", d=4)
@@ -626,12 +624,11 @@ def task_f():
     cross_validation = CROSS_VALIDATION
     test_r, train_r, test_m, train_m, _, _, _ = train_degs(deg)
     errors = [test_m, train_m]
-    labels = ["test MSE", "train MSE"]
+    labels = ["test", "train"]
     print_errors(np.linspace(1, deg, deg), errors, labels,
                  "f/ols_mse_scaling_",
                  logy=True, ylabel="mean squared error", d=4)
     errors = [test_r, train_r]
-    labels = ["test R^2", "train R^2"]
     print_errors(np.linspace(1, deg, deg), errors, labels,
                  "f/ols_R_squared_scaling_",
                  ylabel="R^2 value", logy=True, d=4)
@@ -683,7 +680,7 @@ RESOLUTION = .02
 RANDOM_SEED = 1337
 BOOTSTRAPS = 200
 BEST_L = 1e-2
-DATA_FILE = "files/test.csv"
+DATA_FILE = "files/data.csv"
 np.random.seed(RANDOM_SEED)
 CROSS_VALIDATION = 5
 MAX_ITER = 100000
@@ -692,13 +689,13 @@ show_cond_numbers()
 SCALE_DATA = False
 plot_franke()
 
-#task_a()
+task_a()
 SCALE_DATA = True
-#task_a()
-#task_b()
-#task_c()
+task_a()
+task_b()
+task_c()
 RESOLUTION = .05
-#task_d()
-#task_e()
+task_d()
+task_e()
 MAX_ITER = 1000
 task_f()
