@@ -365,6 +365,7 @@ def print_errors(x_values: np.array, errors: np.array, labels: list, name: str, 
             linestyle = "-"
         plt.plot(x_values, errors[i], label=labels[i], linestyle=linestyle)
     plt.legend()
+    plt.grid()
     ax = fig.gca()
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
@@ -416,14 +417,14 @@ def get_data() -> Tuple[np.array, np.array, np.array]:
     I used some data that I had left over from my previous position. This is calculated magnetic
     field data from some permanent magnet configuration. The data does not follow a strictly
     integer-polynomial trend but can be described not too badly by a polynom within the boundaries.
-    I made the data more sparse by randomly removing 80% of the original data.
+    I made the data more sparse by randomly removing 90% of the original data.
     :return: prepared data
     """
     data = read_data_file()
     x = np.array(data["x"])
     y = np.array(data["y"])
-    z = np.array(data["B"])
-    cutoff = int(np.floor(len(z) * .2))
+    z = np.array(data["z"])
+    cutoff = int(np.floor(len(z) * .1))
     x, y, z = shuffle(x, y, z, random_state=RANDOM_SEED)
     x = x[:cutoff]
     y = y[:cutoff]
@@ -622,30 +623,30 @@ def task_f():
     x, y, z = get_data()
     deg = MAX_DEG
     cross_validation = CROSS_VALIDATION
+    bootstraps = BOOTSTRAPS
     test_r, train_r, test_m, train_m, _, _, _ = train_degs(deg)
     errors = [test_m, train_m]
     labels = ["test", "train"]
     print_errors(np.linspace(1, deg, deg), errors, labels,
-                 "f/ols_mse_scaling_",
+                 "f/ols_mse",
                  logy=True, ylabel="mean squared error", d=4)
     errors = [test_r, train_r]
     print_errors(np.linspace(1, deg, deg), errors, labels,
-                 "f/ols_R_squared_scaling_",
+                 "f/ols_R_squared",
                  ylabel="R^2 value", logy=True, d=4)
 
     deg = 10
-    bootstraps = BOOTSTRAPS
-    minorder = -1
-    maxorder = 7
+    minorder = -3
+    maxorder = 8
     train_print_diff_lambdas(deg=deg, minorder=minorder, maxorder=maxorder,
                              cross_validation=cross_validation,
                              solver="ridge", task="f", x=x, y=y, z=z, d=6)
-    minorder = -6
-    maxorder = 0
+    minorder = -7
+    maxorder = 2
     train_print_diff_lambdas(deg=deg, minorder=minorder, maxorder=maxorder,
                              cross_validation=cross_validation,
                              solver="lasso", task="f", x=x, y=y, z=z, d=6)
-    best_l = 10
+    best_l = 2*10**-1
     deg = MAX_DEG
     train_print_single_lambda(deg=deg, la=best_l, bootstraps=bootstraps, solver="ridge", task="f",
                               x=x, y=y, z=z, d=4)
