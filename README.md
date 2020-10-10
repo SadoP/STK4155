@@ -1,0 +1,3 @@
+This repository completes [the report](https://github.uio.no/Pascalsa/FYS4155/blob/master/FYS-STK4155-Project1-Pascal_Sado.pdf) for the [first assignment](https://compphysics.github.io/MachineLearning/doc/Projects/2020/Project1/html/Project1.html) in FYS-STK4155.  
+Running this python script should take a few minutes and creates the figures and results which are used in the report.  
+For every task there is a function that starts the calculation / creation of figures corresponding to the task, the basic functions that do the calculations for each task are the same and kept as general as possible to make it easier to follow the code and reuse them at a later stage.
