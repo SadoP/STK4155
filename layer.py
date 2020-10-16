@@ -35,6 +35,8 @@ class Costfunctions:
 
 
 class ActivationFunctions:
+    alpha = 0.02
+
     @staticmethod
     def sigmoid(x):
         return 1 / (1 + np.exp(-x))
@@ -61,6 +63,22 @@ class ActivationFunctions:
     @staticmethod
     def relu_grad(x):
         return (x > 0)*1
+
+    @staticmethod
+    def elu(x):
+        return (x > 0) * x + (x < 0) * ActivationFunctions.alpha * (np.exp(x)-1)
+
+    @staticmethod
+    def elu_grad(x):
+        return (x > 0) * 1 + (x < 0) * np.exp(x)*ActivationFunctions.alpha
+
+    @staticmethod
+    def leaky_relu(x):
+        return (x > 0) * x + (x < 0) * x * ActivationFunctions.alpha
+
+    @staticmethod
+    def leaky_relu_grad(x):
+        return (x > 0) * 1 + (x < 0) * ActivationFunctions.alpha
 
 
 class Layer:
