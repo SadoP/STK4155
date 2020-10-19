@@ -5,16 +5,25 @@ from typing import List
 
 
 class Costfunctions:
+    la = 0.1
     @staticmethod
-    def mse(y, yt):
+    def mse(y, yt, l):
         return sum((y - yt)**2)
 
     @staticmethod
-    def mse_grad(y, yt):
+    def mse_grad(y, yt, l):
         return y - yt
 
     @staticmethod
-    def cross_entropy(y, yhat):
+    def ridge(y, yt, l):
+        return np.sum((y - yt)**2) + Costfunctions.la*np.sum(l**2)
+
+    @staticmethod
+    def ridge_grad(y, yt, l):
+        return y - yt + Costfunctions.la*l
+
+    @staticmethod
+    def cross_entropy(y, yhat, l):
         """
         Calculates cross entropy loss
         :param y: true result
@@ -24,7 +33,7 @@ class Costfunctions:
         return -np.sum(y*np.log(yhat) + (1-y)*np.log(1-yhat))
 
     @staticmethod
-    def cross_entropy_grad(y, yhat):
+    def cross_entropy_grad(y, yhat, l):
         """
         Calculates derivative of cross entropy loss
         :param y: true result
@@ -108,11 +117,11 @@ class Layer:
     def activation_grad(self, x):
         return self.af_grad(x)
 
-    def cost_function(self, y, yt):
-        return self.cf(y, yt)
+    def cost_function(self, y, yt, l):
+        return self.cf(y, yt, l)
 
-    def cost_grad(self, y, yt):
-        return self.cf_grad(y, yt)
+    def cost_grad(self, y, yt, l):
+        return self.cf_grad(y, yt, l)
 
     def increment_epoch(self):
         self.epoch += 1
@@ -122,7 +131,7 @@ class LayerDense(Layer):
     def __init__(self,n_inputs, n_outputs, name, learning_rate, cost, activation):
         Layer.__init__(self, n_outputs, name, learning_rate, cost, activation)
         self.biases = 0.01*np.ones((n_outputs, 1))
-        self.weights = np.random.rand(n_outputs, n_inputs)
+        self.weights = np.random.randn(n_outputs, n_inputs)
         self.initial_weights = self.weights
         self.initial_biases = self.biases
 
@@ -158,8 +167,11 @@ class Network:
                 xn = x[:, j * batch_size:(j + 1) * batch_size]
                 yn = y[:, j * batch_size:(j + 1) * batch_size]
                 self.forward_pass(xn)
-                error = layers[-1].cost_function(yn, self.layers[-1].output)
-                self.backward_pass(self.layers[-1].cost_grad(yn, self.layers[-1].output))
+                l = (np.sum(self.layers[-1].weights, axis=1) + self.layers[-1].biases.T).T
+                error = layers[-1].cost_function(yn, self.layers[-1].output, l)
+                self.backward_pass(self.layers[-1].cost_grad(yn, self.layers[-1].output, l))
+                lr = layers[-1].initial_learning_rate / (i*batches+j+1)
+                self.adapt_learning_rate(lr)
             self.C.append(np.sum(error ** 2))
             network.inc_epoch()
 
@@ -181,7 +193,6 @@ class Network:
             layer.increment_epoch()
 
     def adapt_learning_rate(self, lr):
-        print("new learning rate" + str(lr))
         for layer in self.layers:
             layer.learning_rate = lr
 
@@ -198,7 +209,7 @@ n_outputs = 1
 n_samples = 1000
 batch_size = 100
 split_size = 0.8
-epochs = 250
+epochs = 50
 
 
 
@@ -210,8 +221,8 @@ y = test_fun(input)
 x_train, x_test, y_train, y_test = train_test_split(input, y, train_size=split_size)
 
 
-ld1 = LayerDense(n_inputs, n_middle1, "ld1", 0.00001, Costfunctions.mse, ActivationFunctions.sigmoid)
-ld2 = LayerDense(n_middle1, n_middle2, "ld2", 0.00001, Costfunctions.mse, ActivationFunctions.relu)
+ld1 = LayerDense(n_inputs, n_middle1, "ld1", 0.001, Costfunctions.mse, ActivationFunctions.sigmoid)
+ld2 = LayerDense(n_middle1, n_middle2, "ld2", 0.001, Costfunctions.mse, ActivationFunctions.relu)
 #ls = LayerDenseSoftMax(n_middle2, n_outputs, "ls1", 0.001)
 layers = [ld1, ld2]
 network = Network(layers)
