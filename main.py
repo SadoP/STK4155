@@ -1,10 +1,10 @@
+import sys
 from typing import Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.figure import Figure
-from sklearn import linear_model
 from sklearn.preprocessing import scale
 from sklearn.utils import shuffle
 
@@ -32,34 +32,20 @@ def franke(x: np.array, y: np.array, noise_level: float) -> np.array:
     return term1 + term2 + term3 + term4 + noise_level * noise
 
 
-def plot_franke():
-    """
-    plots the franke function for x,y between 0 and 1
-    """
-    x, y = create_grid(RESOLUTION)
-    z = franke(x, y, 0)
-    fig = plt.figure(figsize=(6, 6), dpi=300)
-    ax = fig.gca(projection='3d')
-    surf = ax.plot_surface(x, y, z, cmap=cmaps.parula, linewidth=0)
-    fig.colorbar(surf, shrink=0.5, aspect=5)
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    fig.tight_layout()
-    fig.savefig("images/franke.png")
-
-
 def r2_error(y_data: np.array, y_model: np.array) -> float:
     """
     Calculates R squared based on predicted and true data.
     """
-    return 1 - np.sum((y_data - y_model) ** 2) / np.sum((y_data - np.mean(y_data)) ** 2)
+    r = ((y_data - y_model) ** 2) / np.sum((y_data - np.mean(y_data)) ** 2)
+    return 1-np.sum(r, axis=0)
 
 
 def mse_error(y_data: np.array, y_model: np.array) -> float:
     """
     Calculates mean squared error based in predicted and true data
     """
-    return np.sum((y_data - y_model) ** 2) / np.size(y_model)
+    r = (y_data - y_model) ** 2
+    return np.sum(r, axis=0) / np.size(y_model, 0)
 
 
 def coords_to_polynomial(x: np.array, y: np.array, p: int) -> np.array:
@@ -87,33 +73,82 @@ def coords_to_polynomial(x: np.array, y: np.array, p: int) -> np.array:
     return feat_matrix
 
 
-def solve_lin_equ(y: np.array, x: np.array, solver: str = "ols", la: float = 1) -> Tuple[
-                                                                                         np.array,
-                                                                                         np.array]:
+def solve_lin_equ(y: np.array, x: np.array, solver: str = "ols", epochs: int = 0, batches: int = 0,
+                  la: float = 1, g0: float = 1e-3) -> Tuple[np.array, np.array]:
     """
     Solves linear equation of type y = x*beta. This can be done using ordinary least squares (OLS),
     ridge or lasso regression. For ridge and lasso, an additional parameter l for shrinkage /
-    normlization needs to be provided.
+    normalization needs to be provided.
     :param y: solution vector of linear problem
     :param x: feature vector or matrix of problem
     :param solver: solver. Can be ols, ridge or lasso
     :param la: shrinkage / normalization parameter for ridge or lasso
+    :param g: learning rate factor gamma
     :return: parameter vector that solves the problem & variance of parameter vector
     """
-    beta = np.zeros(x.shape[0])
-    var = np.zeros(beta.shape)
+    if epochs <= 0 or batches <= 0:
+        print("epoch or batch data invalid")
+        sys.exit(-1)
+    beta = np.random.random(size=(x.shape[1], epochs))
+    g = g0
+    bet = 0.9
+    s = 0
+    eps = 1e-8
+    bl = int(np.floor(y.shape[0]/batches))
+    currb = beta[:, 0]
+    for e in range(epochs):
+        for b in range(batches):
+            yb = y[b * bl:(b + 1) * bl - 1]
+            xb = x[b * bl:(b + 1) * bl - 1]
+            c = cost_function(yb, xb, currb, solver)
+            gd = cost_grad(yb, xb, currb, solver)
+            s = bet*s + (1-bet)*gd**2
+            #print(np.max((g * gd/(s+eps))/beta))
+            currb = currb - g * gd/(np.sqrt(s+eps))
+        beta[:, e] = currb
+    return beta
+
+
+def cost_function(y: np.array, x: np.array, beta: np.array, solver: str = "ols", la: float = 1) -> float:
+    """
+    Calculates cost function for ordinary least squares or ridge regression
+    :param y: desired output
+    :param x: feature matrix
+    :param beta: parameters
+    :param solver: solver. Can be ols or ridge
+    :param la: regression parameter for ridge regression
+    :return: Cost value
+    """
     if solver == "ols":
-        var = np.linalg.inv(x.transpose() @ x)
-        beta = np.linalg.pinv(x) @ y
+        return 1/2*np.sum((y - x@beta)**2)
     elif solver == "ridge":
-        var = np.linalg.inv(x.transpose() @ x + la * np.identity(x.shape[1]))
-        beta = var @ x.transpose() @ y
-    elif solver == "lasso":
-        clf = linear_model.Lasso(alpha=la, max_iter=MAX_ITER)
-        clf.fit(x, y)
-        beta = clf.coef_
-        var = np.zeros(shape=(1, 1))
-    return beta, np.abs(var.diagonal())
+        return 1/2*np.sum((y - x@beta)**2) + 1/2*la*np.sum(beta**2)
+    elif solver == "logistic":
+        return -np.sum(y*np.log(x@beta) + (1-y)*np.log(1-x@beta))
+
+
+def cost_grad(y: np.array, x: np.array, beta: np.array, solver: str = "ols", la: float = 1) -> np.array:
+    """
+    Calculates gradient of cost function in parameter direction
+    :param y: desired output
+    :param x: feature matrix
+    :param beta: parameters
+    :param solver: solver. Can be ols or ridge
+    :param la: regression parameter for ridge regression
+    :return: gradient of cost function
+    """
+    if solver == "ols":
+        return - (y - x@beta)@x
+    elif solver == "ridge":
+        res = - (y - x@beta)@x + la * np.sum(beta)
+        if np.isnan(np.sum(res)):
+            print(y)
+            print(x)
+            print(beta)
+            sys.exit()
+        return res
+    elif solver == "logistic":
+        return (x@beta - y)/(x@beta - x@beta**2)
 
 
 def create_grid(res: float) -> Tuple[np.array, np.array]:
@@ -128,8 +163,7 @@ def create_grid(res: float) -> Tuple[np.array, np.array]:
     return x, y
 
 
-def create_data(deg: int, cross_validation: int = 1, x: np.array = None, y: np.array = None,
-                z: np.array = None) \
+def create_data(deg: int, x: np.array = None, y: np.array = None, z: np.array = None) \
         -> Tuple[np.array, np.array, np.array, np.array]:
     """
     Creates the data that is used for the regression. Depending on the given degree of the
@@ -141,8 +175,6 @@ def create_data(deg: int, cross_validation: int = 1, x: np.array = None, y: np.a
     If values for x,y and z are provided, no feature matrix is created but instead the given values
     are passed on. The function also performs scaling of the data, if necessary.
     :param deg: Degree of the polynomial
-    :param cross_validation: Number of folds for cross validation. Default: 1. This means a split
-        in 80:20 training:test without cross validation
     :param x: x-vector
     :param y: y-vector
     :param z: z-vector
@@ -162,42 +194,21 @@ def create_data(deg: int, cross_validation: int = 1, x: np.array = None, y: np.a
         z = franke(x, y, NOISE_LEVEL).flatten()
     # dimensions of the feature matrix
     n = int(feature_mat.shape[0])
-    m = int(feature_mat.shape[1])
-    # k will be the amount of folds
     # test_l is the length of the test split
-    # train_l is the length of the training split
-    if cross_validation == 1:
-        # 80:20 split in train and test data
-        k = 1
-        test_l = int(np.floor(n * 0.2))
-        train_l = n - test_l
-    else:
-        # split into k folds, length depends on amount of folds
-        k = cross_validation
-        test_l = int(np.floor(n / k))
-        train_l = n - test_l
+    # 80:20 split in train and test data
+    test_l = int(np.floor(n * 0.2))
+
     # randomizing order of feature matrix and result vector and allocating split variables
     feature_mat, z = shuffle(feature_mat, z, random_state=RANDOM_SEED)
-    feature_mat_train = np.zeros(shape=(k, train_l, m))
-    feature_mat_test = np.zeros(shape=(k, test_l, m))
-    z_train = np.zeros(shape=(k, train_l))
-    z_test = np.zeros(shape=(k, test_l))
-    for i in range(k):
-        # For each split the first test_l amount of data is removed from the training set. The same
-        # array of data is then the test set for this fold.
-        feature_mat_train[i, :, :] = np.delete(feature_mat,
-                                               np.arange(i * test_l, (i + 1) * test_l, 1, int),
-                                               axis=0)
-        feature_mat_test[i, :, :] = feature_mat[i * test_l:(i + 1) * test_l, :]
-        z_train[i, :] = np.delete(z, np.arange(i * test_l, (i + 1) * test_l, 1, int), axis=0)
-        z_test[i, :] = z[i * test_l:(i + 1) * test_l]
+    feature_mat_train = np.delete(feature_mat, np.arange(0, test_l, 1, int), axis=0)
+    feature_mat_test = feature_mat[:test_l, :]
+    z_train = np.delete(z, np.arange(0, test_l, 1, int), axis=0)
+    z_test = z[:test_l]
+    z_test = np.expand_dims(z_test, 1)
+    z_train = np.expand_dims(z_train, 1)
     # reshaping to make it easier in the coming functions. The first two indeces are left in their
-    # previous relative and are the length and height of the feautres. The now last index represents
+    # previous relative and are the length and height of the features. The now last index represents
     # the fold.
-    feature_mat_train = np.transpose(feature_mat_train, (1, 2, 0))
-    feature_mat_test = np.transpose(feature_mat_test, (1, 2, 0))
-    z_train = np.transpose(z_train, (1, 0))
-    z_test = np.transpose(z_test, (1, 0))
     return feature_mat_train, feature_mat_test, z_train, z_test
 
 
@@ -221,17 +232,13 @@ def err_from_var(var: np.array, sample_size: int) -> np.array:
     return 1.97 * np.sqrt(var) / np.sqrt(sample_size)
 
 
-def train(deg: int, cross_validation: int = 1, bootstraps: int = 0, solver: str = "ols",
-          la: float = 1,
-          x: np.array = None, y: np.array = None, z: np.array = None) -> \
-        Tuple[np.array, np.array, np.array, np.array, np.array, np.array, np.array]:
+def train(deg: int, solver: str = "ols", la: float = 1, epochs: int = 0, batches: int = 0,
+          x: np.array = None, y: np.array = None, z: np.array = None, g0: float = 1e-3) \
+          -> Tuple[np.array, np.array, np.array, np.array, np.array]:
     """
-    Calculates fit based on given degree. If cross validation of bootstraps are given, the
-    corresponding algorithms will be applied. If noe data for x,y and z are given, data will be
+    Calculates fit based on given degree. If no data for x,y and z are given, data will be
     created from / for the franke function, otherwise the provided data will be used
     :param deg: Degree of the polynomial to be fitted onto
-    :param cross_validation: amount of folds for cross validation. Default:1 means 80:20 split
-    :param bootstraps: amount of bootstraps for bootstrap evaluation
     :param solver: Algorithm for solving. Can be ols, ridge or lasso
     :param la: parameter for ridge and lasso regression
     :param x: x-vector
@@ -241,48 +248,18 @@ def train(deg: int, cross_validation: int = 1, bootstraps: int = 0, solver: str 
         data R squqared value and mean squared error
     """
     # creates feature matrix and result vector
-    feature_mat_train, feature_mat_test, z_train, z_test = create_data(deg, cross_validation, x=x,
-                                                                       y=y, z=z)
+    train_x, test_x, train_z, test_z = create_data(deg, x=x, y=y, z=z)
     # declares variables for results
-    test_rs = np.zeros(shape=cross_validation)
-    test_ms = np.zeros(shape=cross_validation)
-    train_rs = np.zeros(shape=cross_validation)
-    train_ms = np.zeros(shape=cross_validation)
-    beta = np.zeros(feature_mat_test.shape[1])
-    var = np.zeros(beta.shape)
-    err = np.zeros(beta.shape)
-    # looping over folds for cross validation
-    for i in range(cross_validation):
-        # solving the linear equation, calculating error for parameter vector
-        beta, var = solve_lin_equ(z_train[:, i].flatten(), feature_mat_train[:, :, i],
-                                  solver=solver, la=la)
-        err = err_from_var(var, len(z_train[:, i]))
-        if bootstraps > 0:
-            # If bootstrap resampling is to be evaluated, randomly select samples from the training
-            # data. The index variable may contain the same values several times
-            train_l = feature_mat_train.shape[0]
-            train_inds = np.random.randint(0, high=train_l, size=bootstraps)
-            train_x = feature_mat_train[train_inds, :, i]
-            train_z = z_train[train_inds, i]
-            test_x = feature_mat_test[:, :, i]
-            test_z = z_test[:, i]
-        else:
-            # No bootstrap: Every result is part of the sample
-            test_x = feature_mat_test[:, :, i]
-            train_x = feature_mat_train[:, :, i]
-            test_z = z_test[:, i]
-            train_z = z_train[:, i]
-        # Calculate errors based on the chosen samples
-        test_rs[i] = r2_error(test_z, predict(beta, test_x))
-        test_ms[i] = mse_error(test_z, predict(beta, test_x))
-        train_rs[i] = r2_error(train_z, predict(beta, train_x))
-        train_ms[i] = mse_error(train_z, predict(beta, train_x))
-    # average over the folds
-    test_r = np.average(test_rs)
-    train_r = np.average(train_rs)
-    test_m = np.average(test_ms)
-    train_m = np.average(train_ms)
-    return test_r, train_r, test_m, train_m, beta, var, err
+    # solving the linear equation, calculating error for parameter vector
+    beta = solve_lin_equ(train_z.flatten(), train_x, solver=solver, epochs=epochs, batches=batches,
+                         la=la, g0=g0)
+    # Calculate errors based on the chosen samples
+    test_r = r2_error(test_z, predict(beta, test_x))
+    test_m = mse_error(test_z, predict(beta, test_x))
+    train_r = r2_error(train_z, predict(beta, train_x))
+    train_m = mse_error(train_z, predict(beta, train_x))
+    #print(test_r)
+    return test_r, train_r, test_m, train_m, beta
 
 
 def max_mat_len(maxdeg: int) -> int:
@@ -294,15 +271,13 @@ def max_mat_len(maxdeg: int) -> int:
     return int((maxdeg + 2) * (maxdeg + 1) / 2)
 
 
-def train_degs(maxdeg: int, cross_validation: int = 1, bootstraps: int = 0, solver: str = "ols",
-               la: float = 1,
-               x: np.array = None, y: np.array = None, z: np.array = None) \
-        -> Tuple[np.array, np.array, np.array, np.array, np.array, np.array, np.array]:
+def train_degs(maxdeg: int, solver: str = "ols",
+               la: float = 1, epochs: int = 0, batches: int = 0,
+               x: np.array = None, y: np.array = None, z: np.array = None, g0: float = 1e-3) \
+        -> Tuple[np.array, np.array, np.array, np.array, np.array]:
     """
     This is a wrapper for the function "train", that loops over all the degrees given in maxdeg
     :param maxdeg: highest order degree to be trained
-    :param cross_validation: amount of folds for cross validation. Default:1 means 80:20 split
-    :param bootstraps: amount of bootstraps for bootstrap evaluation
     :param solver: Algorithm for solving. Can be ols, ridge or lasso
     :param la: parameter for ridge and lasso regression
     :param x: x-vector
@@ -312,29 +287,24 @@ def train_degs(maxdeg: int, cross_validation: int = 1, bootstraps: int = 0, solv
         data R squqared value and mean squared error
     """
     # declare variables so that the values can be assigned in the loop
-    beta = np.zeros(shape=(maxdeg, max_mat_len(maxdeg)))
+    beta = np.zeros(shape=(maxdeg, max_mat_len(maxdeg), epochs))
     var = np.zeros(shape=(maxdeg, max_mat_len(maxdeg)))
     err = np.zeros(shape=(maxdeg, max_mat_len(maxdeg)))
-    test_r = np.zeros(shape=(maxdeg, 1))
-    train_r = np.zeros(shape=(maxdeg, 1))
-    test_m = np.zeros(shape=(maxdeg, 1))
-    train_m = np.zeros(shape=(maxdeg, 1))
+    test_r = np.zeros(shape=(maxdeg, epochs))
+    train_r = np.zeros(shape=(maxdeg, epochs))
+    test_m = np.zeros(shape=(maxdeg, epochs))
+    train_m = np.zeros(shape=(maxdeg, epochs))
     # looping over every degree to be trained
     for i in range(maxdeg):
         print("training degree: " + str(i + 1))
-        t = train(i + 1, cross_validation=cross_validation, bootstraps=bootstraps, solver=solver,
-                  la=la, x=x, y=y, z=z)
+        t = train(i + 1, solver=solver, epochs=epochs, batches=batches, la=la, x=x, y=y, z=z, g0=g0)
         b = t[4]
         beta[i, 0:len(b)] = b
-        v = t[5]
-        var[i, 0:len(v)] = v
-        e = t[6]
-        err[i, 0:len(e)] = e
-        test_r[i] = t[0]
-        train_r[i] = t[1]
-        test_m[i] = t[2]
-        train_m[i] = t[3]
-    return test_r.ravel(), train_r.ravel(), test_m.ravel(), train_m.ravel(), beta, var, err
+        test_r[i, :] = t[0]
+        train_r[i, :] = t[1]
+        test_m[i, :] = t[2]
+        train_m[i, :] = t[3]
+    return test_r, train_r, test_m, train_m, beta
 
 
 def print_errors(x_values: np.array, errors: np.array, labels: list, name: str, logy: bool = False,
@@ -373,7 +343,7 @@ def print_errors(x_values: np.array, errors: np.array, labels: list, name: str, 
         plt.yscale('log')
     if logx:
         plt.xscale('log')
-    fig.tight_layout()
+#    fig.tight_layout()
     fig.savefig("images/" + name + ".png", dpi=300)
     return fig
 
@@ -449,19 +419,78 @@ def print_data() -> Figure:
     return fig
 
 
-def train_print_diff_lambdas(deg: int, minorder: int, maxorder: int, cross_validation: int = 1,
-                             bootstraps: int = 0,
+def loop_over_batches(deg: int, values: np.array,
                              solver: str = "ridge", x: np.array = None, y: np.array = None,
-                             z: np.array = None,
-                             task: str = "a", d: int = 6) -> None:
+                             z: np.array = None, la: float = 1, epochs: int = 0, g0: float = 1e-3):
+    n = values.shape[0]
+    test_r = np.zeros(shape=(deg, n, epochs))
+    train_r = np.zeros(shape=(deg, n, epochs))
+    test_m = np.zeros(shape=(deg, n, epochs))
+    train_m = np.zeros(shape=(deg, n, epochs))
+    beta = np.zeros(shape=(deg, max_mat_len(deg), n, epochs))
+    i = 0
+    for v in values:
+        test_r[:, i, :], train_r[:, i, :], test_m[:, i, :], train_m[:, i, :], beta[:, :, i, :] = train_degs(
+            maxdeg=deg, epochs=epochs, batches=v,
+            solver=solver, la=la, x=x, y=y, z=z, g0=g0)
+        i = i + 1
+    return test_r[:, :, -1], train_r[:, :, -1], test_m[:, :, -1], train_m[:, :, -1], beta[:, :, :, -1]
+
+
+def loop_over_epochs(deg: int, values: np.array,
+                             solver: str = "ridge", x: np.array = None, y: np.array = None,
+                             z: np.array = None, la: float = 1, batches: int = 0, g0:float = 1e-3):
+    v = np.max(values)
+    test_r, train_r, test_m, train_m, beta = train_degs(maxdeg=deg, epochs=v, batches=batches,
+                                                        solver=solver, la=la, x=x, y=y, z=z, g0=g0)
+    return test_r, train_r, test_m, train_m, beta
+
+
+def loop_over_lambda(deg: int, values: np.array,
+                             solver: str = "ridge", x: np.array = None, y: np.array = None,
+                             z: np.array = None, epochs: int = 0, batches: int = 0, g0:float = 1e-3):
+    n = values.shape[0]
+    test_r = np.zeros(shape=(deg, n, epochs))
+    train_r = np.zeros(shape=(deg, n, epochs))
+    test_m = np.zeros(shape=(deg, n, epochs))
+    train_m = np.zeros(shape=(deg, n, epochs))
+    beta = np.zeros(shape=(deg, max_mat_len(deg), n, epochs))
+    i = 0
+    for v in values:
+        test_r[:, i, :], train_r[:, i, :], test_m[:, i, :], train_m[:, i, :], beta[:, :, i, :] = train_degs(
+            maxdeg=deg, epochs=epochs, batches=batches,
+            solver=solver, la=v, x=x,
+            y=y, z=z, g0=g0)
+        i = i + 1
+    return test_r[:, :, -1], train_r[:, :, -1], test_m[:, :, -1], train_m[:, :, -1], beta[:, :, :, -1]
+
+
+def loop_over_learning_rate(deg: int, values: np.array,
+                           solver: str = "ridge", x: np.array = None, y: np.array = None,
+                           z: np.array = None, epochs: int = 0, batches: int = 0, la: float = 1):
+    n = values.shape[0]
+    test_r = np.zeros(shape=(deg, n, epochs))
+    train_r = np.zeros(shape=(deg, n, epochs))
+    test_m = np.zeros(shape=(deg, n, epochs))
+    train_m = np.zeros(shape=(deg, n, epochs))
+    beta = np.zeros(shape=(deg, max_mat_len(deg), n, epochs))
+    i = 0
+    for v in values:
+        print(v)
+        test_r[:, i, :], train_r[:, i, :], test_m[:, i, :], train_m[:, i, :], beta[:, :, i, :] = train_degs(
+            maxdeg=deg, epochs=epochs, batches=batches, solver=solver, la=la, x=x, y=y, z=z, g0=v)
+        i = i + 1
+    return test_r[:, :, -1], train_r[:, :, -1], test_m[:, :, -1], train_m[:, :, -1], beta[:, :, :, -1]
+
+
+def train_print_hyperparameter(deg: int, parameter: str, values: np.array,
+                               solver: str = "ridge", x: np.array = None, y: np.array = None,
+                               z: np.array = None, epochs: int = 0, batches: int = 0, la: float = 1,
+                               g0: float = 1e-3, task: str = "a", d: int = 6) -> None:
     """
-    Wrapper functino around "train_degs", that is able to handle different parameters for ridge and
-    lasso and automatically prints the resulting diagramms.
+    Wrapper function around "train_degs", that is able to handle different parameters for ridge and
+    lasso and automatically prints the resulting diagrams.
     :param deg: maximum degree for which to train
-    :param minorder: minimum order of magnitude for parameter
-    :param maxorder: maximum order of magnitude for parameter
-    :param cross_validation: folds for cross validation
-    :param bootstraps: amount of bootstraps
     :param solver: ridge or lasso
     :param x: x vector
     :param y: y vector
@@ -469,27 +498,25 @@ def train_print_diff_lambdas(deg: int, minorder: int, maxorder: int, cross_valid
     :param task: task this belongs to, to sort the figures into the correct folder
     :return: None
     """
-    if task == "f" or task == "e": logy = False
-    else: logy = True
-    order = np.array([minorder, maxorder])
-    n = int(np.linalg.norm(order, 1) * 5)
-    test_r = np.zeros(shape=(deg, n))
-    train_r = np.zeros(shape=(deg, n))
-    test_m = np.zeros(shape=(deg, n))
-    train_m = np.zeros(shape=(deg, n))
-    # different parameters created based on the orders given before, equally spaced on a logarithmic
-    # scale
-    lambdas = np.logspace(order[0], order[1], num=n)
-    i = 0
-    # iterating over lambdas
-    for la in lambdas:
-        test_r[:, i], train_r[:, i], test_m[:, i], train_m[:, i], beta, var, err = train_degs(
-            maxdeg=deg,
-            cross_validation=cross_validation,
-            bootstraps=bootstraps,
-            solver=solver, la=la, x=x,
-            y=y, z=z)
-        i = i + 1
+    if parameter == "epoch":
+        test_r, train_r, test_m, train_m, beta = loop_over_epochs(deg=deg, values=values,
+                                                                  solver=solver, x=x, y=y, z=z,
+                                                                  la=la, batches=batches, g0=g0)
+    elif parameter == "batch":
+        test_r, train_r, test_m, train_m, beta = loop_over_batches(deg=deg, values=values,
+                                                                   solver=solver, x=x, y=y, z=z,
+                                                                   epochs=epochs, la=la, g0=g0)
+    elif parameter == "lambda":
+        test_r, train_r, test_m, train_m, beta = loop_over_lambda(deg=deg, values=values,
+                                                                  solver=solver, x=x, y=y, z=z,
+                                                                  epochs=epochs, batches=batches, g0=g0)
+    elif parameter == "learning_rate":
+        test_r, train_r, test_m, train_m, beta = loop_over_learning_rate(deg=deg, values=values,
+                                                                  solver=solver, x=x, y=y, z=z,
+                                                                  epochs=epochs, batches=batches, la=la)
+    else:
+        print("invalid parameter given")
+        sys.exit(-2)
     # refactoring shape of error and label vectors
     errors = np.append(test_m, train_m, axis=0)
     labels = [[], []]
@@ -499,206 +526,120 @@ def train_print_diff_lambdas(deg: int, minorder: int, maxorder: int, cross_valid
     # https://stackoverflow.com/a/952952
     labels = [item for sublist in labels for item in sublist]
     # plotting mean squared error
-    print_errors(lambdas, errors, labels,
-                 task + "/" + solver + "_mse_cross_" + str(cross_validation) + "_boot_" + str(
-                     bootstraps), logx=True, logy=True,
-                 xlabel="lambda", d=d, ylabel="mean squared error")
+    if parameter=="lambda" or parameter == "learning_rate":
+        logx = True
+    else:
+        logx = False
+    print_errors(values, errors, labels,
+                 task + "/" + solver + "_mse_parameter_"+parameter, logx=logx, logy=True,
+                 xlabel=parameter, d=d, ylabel="mean squared error")
     errors = np.append(test_r, train_r, axis=0)
     labels = [[], []]
     for i in range(deg):
         labels[0].extend(["test R^2 " + str(i + 1)])
         labels[1].extend(["train R^2 " + str(i + 1)])
     labels = [item for sublist in labels for item in sublist]
-    print_errors(lambdas, errors, labels,
-                 task + "/" + solver + "_R_squared_cross_" + str(cross_validation) + "_boot_" + str(
-                     bootstraps), logx=True, logy=logy,
-                 xlabel="lambda", d=d, ylabel="R^2 value")
+    print_errors(values, errors, labels,
+                 task + "/" + solver + "_r_squared_parameter_"+parameter, logx=logx, logy=True,
+                 xlabel=parameter, d=d, ylabel="R^2 value")
 
 
-def train_print_single_lambda(deg: int, la: float = 0, cross_validation: int = 1,
-                              bootstraps: int = 0,
+def train_print_single_lambda(deg: int, epochs: int, batches: int, la: float = 0,
                               solver: str = "ridge", x: np.array = None, y: np.array = None,
-                              z: np.array = None,
-                              task: str = "a", d: int = 6):
+                              z: np.array = None, task: str = "a", d: int = 6):
     """
     Same as "train_print_diff_lambdas" but only for a single lambda
     :param deg: maximum degree for which to train
-    :param la: lambda for which to plot
-    :param cross_validation: folds for cross validation
-    :param bootstraps: amount of bootstraps
+    :param batches:
+    :param epochs:     :param la: lambda for which to plot
     :param solver: ridge or lasso
     :param x: x vector
     :param y: y vector
     :param z: z vector
     :param task: task this belongs to, to sort the figures into the correct folder
+    :param d:
     :return: None
     """
-    if task == "f" or task == "e": logy = False
-    else: logy = True
-    test_r, train_r, test_m, train_m, beta, var, err = train_degs(maxdeg=deg,
-                                                                  cross_validation=cross_validation,
-                                                                  bootstraps=bootstraps,
-                                                                  solver=solver, la=la,
-                                                                  x=x, y=y, z=z)
-    errors = [test_m, train_m]
+    if task == "f" or task == "e":
+        logy = False
+    else:
+        logy = True
+    test_r, train_r, test_m, train_m, beta = train_degs(maxdeg=deg, solver=solver, la=la, x=x, y=y,
+                                                        z=z, epochs=epochs, batches=batches)
+    errors = [test_m[:, -1], train_m[:, -1]]
     labels = ["test MSE", "train MSE"]
     print_errors(np.linspace(1, deg, deg), errors, labels,
-                 task + "/" + solver + "_mse_deg" + str(deg) + "_cross_" +
-                 str(cross_validation) + "_Boot_" + str(bootstraps) + "_lambda_" + str(la),
+                 task + "/" + solver + "_mse_deg" + str(deg) + "_epochs_" +
+                 str(epochs) + "_batches_" + str(batches) + "_lambda_" + str(la),
                  logy=True, ylabel="mean squared error", d=d)
-    errors = [test_r, train_r]
+    errors = [test_r[:, -1], train_r[:, -1]]
     labels = ["test R^2 ", "train R^2 "]
     print_errors(np.linspace(1, deg, deg), errors, labels,
-                 task + "/" + solver + "_R_squared_deg" + str(deg) + "_cross_" +
-                 str(cross_validation) + "_Boot_" + str(bootstraps) + "_lambda_" + str(la),
+                 task + "/" + solver + "_R_squared_deg" + str(deg) + "_epochs_" +
+                 str(epochs) + "_batches_" + str(batches) + "_lambda_" + str(la),
                  logy=logy, ylabel="R squared value", d=d)
 
 
 def task_a():
-    deg = 5
-    test_r, train_r, test_m, train_m, beta, var, err = train_degs(deg)
-    print_cont(deg, err, "a/ols_error_scaling_" + SCALE_DATA.__str__(), "Parameter error")
-    print_cont(deg, beta, "a/ols_betas_scaling_" + SCALE_DATA.__str__(), "Parameter values")
-    errors = [test_m, train_m]
+    deg = 10
+    epochs = EPOCHS
+    batches = BATCHES
+    g0 = LEARNING_RATE
+    test_r, train_r, test_m, train_m, beta = train_degs(deg, epochs=epochs, batches=batches, g0=g0)
+    print_cont(deg, beta[:, :, -1], "a/ols_betas_epochs_" + str(epochs) + "_batches_" + str(batches),
+               "Parameter values")
+    errors = [test_m[:, -1], train_m[:, -1]]
     labels = ["test MSE", "train MSE"]
     print_errors(np.linspace(1, deg, deg), errors, labels,
-                 "a/ols_mse_scaling_" + SCALE_DATA.__str__(),
+                 "a/ols_mse_epochs_" + str(epochs) + "_batches_" + str(batches),
                  logy=True, ylabel="mean squared error", d=4)
-    errors = [test_r, train_r]
+    errors = [test_r[:, -1], train_r[:, -1]]
     labels = ["test R^2", "train R^2"]
     print_errors(np.linspace(1, deg, deg), errors, labels,
-                 "a/ols_R_squared_scaling_" + SCALE_DATA.__str__(),
+                 "a/ols_R_squared_epochs_" + str(epochs) + "_batches_" + str(batches),
                  ylabel="R^2 value", d=4)
-
-
-def task_b():
-    deg = MAX_DEG
-    bootstraps = np.array([0, BOOTSTRAPS])
-    for bs in bootstraps:
-        train_print_single_lambda(deg=deg, bootstraps=bs, solver="ols", task="b", d=4)
-
-
-def task_c():
-    deg = MAX_DEG
-    cross_validation = np.array([5, 10])
-    for cr in cross_validation:
-        train_print_single_lambda(deg=deg, cross_validation=cr, task="c", solver="ols", d=4)
-
-
-def task_d():
     deg = 10
-    bootstraps = BOOTSTRAPS
-    cross_validation = CROSS_VALIDATION
-    minorder = -7
-    maxorder = 5
-    train_print_diff_lambdas(deg=deg, minorder=minorder, maxorder=maxorder,
-                             cross_validation=cross_validation,
-                             solver="ridge", task="d", d=6)
-    train_print_diff_lambdas(deg=deg, minorder=minorder, maxorder=maxorder, bootstraps=bootstraps,
-                             solver="ridge", task="d", d=6)
-    best_l = 1
-    train_print_single_lambda(deg=MAX_DEG * 2, la=best_l, bootstraps=bootstraps, solver="ridge",
-                              task="d", d=4)
-
-
-def task_e():
-    deg = 10
-    cross_validation = CROSS_VALIDATION
-    bootstraps = BOOTSTRAPS
-    minorder = -4
-    maxorder = 0
-    train_print_diff_lambdas(deg=deg, minorder=minorder, maxorder=maxorder,
-                             cross_validation=cross_validation,
-                             solver="lasso", task="e", d=6)
-    train_print_diff_lambdas(deg=deg, minorder=minorder, maxorder=maxorder, bootstraps=bootstraps,
-                             solver="lasso", task="e", d=6)
-    best_l = 2e-2
-    train_print_single_lambda(deg=MAX_DEG * 2, la=best_l, bootstraps=bootstraps, solver="lasso",
-                              task="e", d=4)
-    best_l = 2e-1
-    train_print_single_lambda(deg=MAX_DEG * 2, la=best_l, bootstraps=bootstraps, solver="lasso",
-                              task="e", d=4)
-
-
-def task_f():
-    x, y, z = get_data()
-    deg = MAX_DEG
-    cross_validation = CROSS_VALIDATION
-    test_r, train_r, test_m, train_m, _, _, _ = train_degs(deg)
-    errors = [test_m, train_m]
-    labels = ["test MSE", "train MSE"]
-    print_errors(np.linspace(1, deg, deg), errors, labels,
-                 "f/ols_mse_scaling_",
-                 logy=True, ylabel="mean squared error", d=4)
-    errors = [test_r, train_r]
-    labels = ["test R^2", "train R^2"]
-    print_errors(np.linspace(1, deg, deg), errors, labels,
-                 "f/ols_R_squared_scaling_",
-                 ylabel="R^2 value", logy=True, d=4)
-
-    deg = 10
-    bootstraps = BOOTSTRAPS
-    minorder = -1
-    maxorder = 7
-    train_print_diff_lambdas(deg=deg, minorder=minorder, maxorder=maxorder,
-                             cross_validation=cross_validation,
-                             solver="ridge", task="f", x=x, y=y, z=z, d=6)
     minorder = -6
     maxorder = 0
-    train_print_diff_lambdas(deg=deg, minorder=minorder, maxorder=maxorder,
-                             cross_validation=cross_validation,
-                             solver="lasso", task="f", x=x, y=y, z=z, d=6)
-    best_l = 10
-    deg = MAX_DEG
-    train_print_single_lambda(deg=deg, la=best_l, bootstraps=bootstraps, solver="ridge", task="f",
-                              x=x, y=y, z=z, d=4)
+    order = np.array([minorder, maxorder])
+    n = int(np.linalg.norm(order, 1) * 10)
+    lrs = np.logspace(order[0], order[1], num=n)
+    train_print_hyperparameter(deg=deg, values=lrs, parameter="learning_rate",
+                               solver="ols", epochs=epochs, batches=batches, task="a", d=6)
+    g0 = 2e-3
+    btchs = np.linspace(1, 50, 50, dtype=int)
+    train_print_hyperparameter(deg=deg, values=btchs, parameter="batch", g0=g0,
+                               solver="ols", epochs=epochs, task="a", d=6)
+    batches = 35
+    epcs = np.linspace(1, 250, 250, dtype=int)
+    train_print_hyperparameter(deg=deg, values=epcs, parameter="epoch", g0=g0,
+                               solver="ols", batches=batches, task="a", d=6)
+    epochs = 50
+    minorder = -4
+    maxorder = 4
+    order = np.array([minorder, maxorder])
+    n = int(np.linalg.norm(order, 1) * 5)
+    lambdas = np.logspace(order[0], order[1], num=n)
+    train_print_hyperparameter(deg=deg, values=lambdas, parameter="lambda", g0=g0,
+                               solver="ridge", epochs=epochs, batches=batches, task="a", d=6)
 
 
-def show_cond_numbers():
-    """
-    Calculates and prints condition numbers for different feature matrices
-    :return: None
-    """
-    x, y = create_grid(0.1)
-    x3 = coords_to_polynomial(x, y, 3)
-    x5 = coords_to_polynomial(x, y, 5)
-    x10 = coords_to_polynomial(x, y, 10)
-    c3 = np.linalg.cond(x3.transpose() @ x3)
-    c5 = np.linalg.cond(x5.transpose() @ x5)
-    c10 = np.linalg.cond(x10.transpose() @ x10)
-    x3 = scale(x3, axis=1)
-    x5 = scale(x5, axis=1)
-    x10 = scale(x10, axis=1)
-    c3s = np.linalg.cond(x3.transpose() @ x3)
-    c5s = np.linalg.cond(x5.transpose() @ x5)
-    c10s = np.linalg.cond(x10.transpose() @ x10)
-    print("condition numbers for different degress of the polynomial:\n"
-          "deg3: %f\ndeg5: %f\ndeg10:%f\nSame for centered data:\ndeg3: %f\ndeg5: %f\ndeg10:%f" % (
-              c3, c5, c10, c3s, c5s, c10s))
 
 
 NOISE_LEVEL = 0.1
 MAX_DEG = 30
 RESOLUTION = .02
 RANDOM_SEED = 1337
-BOOTSTRAPS = 200
-BEST_L = 1e-2
+SCALE_DATA = True
 DATA_FILE = "files/test.csv"
 np.random.seed(RANDOM_SEED)
-CROSS_VALIDATION = 5
 MAX_ITER = 100000
 
-show_cond_numbers()
-SCALE_DATA = False
-plot_franke()
+EPOCHS = 100
+BATCHES = 20
+LEARNING_RATE = 1e-3
 
-#task_a()
-SCALE_DATA = True
-#task_a()
-#task_b()
-#task_c()
-RESOLUTION = .05
-#task_d()
-#task_e()
-MAX_ITER = 1000
-task_f()
+task_a()
+EPOCHS = 50
+BATCHES = 30
+LEARNING_RATE = 2e-3
