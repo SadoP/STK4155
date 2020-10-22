@@ -4,6 +4,9 @@ from typing import Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import itertools as it
+
+from console_progressbar import ProgressBar
 from matplotlib.figure import Figure
 from sklearn.preprocessing import scale
 from sklearn.utils import shuffle
@@ -37,7 +40,7 @@ def r2_error(y_data: np.array, y_model: np.array) -> float:
     Calculates R squared based on predicted and true data.
     """
     r = ((y_data - y_model) ** 2) / np.sum((y_data - np.mean(y_data)) ** 2)
-    return 1-np.sum(r, axis=0)
+    return 1 - np.sum(r, axis=0)
 
 
 def mse_error(y_data: np.array, y_model: np.array) -> float:
@@ -94,7 +97,7 @@ def solve_lin_equ(y: np.array, x: np.array, solver: str = "ols", epochs: int = 0
     bet = 0.9
     s = 0
     eps = 1e-8
-    bl = int(np.floor(y.shape[0]/batches))
+    bl = int(np.floor(y.shape[0] / batches))
     currb = beta[:, 0]
     for e in range(epochs):
         for b in range(batches):
@@ -102,14 +105,15 @@ def solve_lin_equ(y: np.array, x: np.array, solver: str = "ols", epochs: int = 0
             xb = x[b * bl:(b + 1) * bl - 1]
             c = cost_function(yb, xb, currb, solver)
             gd = cost_grad(yb, xb, currb, solver)
-            s = bet*s + (1-bet)*gd**2
-            #print(np.max((g * gd/(s+eps))/beta))
-            currb = currb - g * gd/(np.sqrt(s+eps))
+            s = bet * s + (1 - bet) * gd ** 2
+            # print(np.max((g * gd/(s+eps))/beta))
+            currb = currb - g * gd / (np.sqrt(s + eps))
         beta[:, e] = currb
     return beta
 
 
-def cost_function(y: np.array, x: np.array, beta: np.array, solver: str = "ols", la: float = 1) -> float:
+def cost_function(y: np.array, x: np.array, beta: np.array, solver: str = "ols",
+                  la: float = 1) -> float:
     """
     Calculates cost function for ordinary least squares or ridge regression
     :param y: desired output
@@ -120,14 +124,15 @@ def cost_function(y: np.array, x: np.array, beta: np.array, solver: str = "ols",
     :return: Cost value
     """
     if solver == "ols":
-        return 1/2*np.sum((y - x@beta)**2)
+        return 1 / 2 * np.sum((y - x @ beta) ** 2)
     elif solver == "ridge":
-        return 1/2*np.sum((y - x@beta)**2) + 1/2*la*np.sum(beta**2)
+        return 1 / 2 * np.sum((y - x @ beta) ** 2) + 1 / 2 * la * np.sum(beta ** 2)
     elif solver == "logistic":
-        return -np.sum(y*np.log(x@beta) + (1-y)*np.log(1-x@beta))
+        return -np.sum(y * np.log(x @ beta) + (1 - y) * np.log(1 - x @ beta))
 
 
-def cost_grad(y: np.array, x: np.array, beta: np.array, solver: str = "ols", la: float = 1) -> np.array:
+def cost_grad(y: np.array, x: np.array, beta: np.array, solver: str = "ols",
+              la: float = 1) -> np.array:
     """
     Calculates gradient of cost function in parameter direction
     :param y: desired output
@@ -138,9 +143,9 @@ def cost_grad(y: np.array, x: np.array, beta: np.array, solver: str = "ols", la:
     :return: gradient of cost function
     """
     if solver == "ols":
-        return - (y - x@beta)@x
+        return - (y - x @ beta) @ x
     elif solver == "ridge":
-        res = - (y - x@beta)@x + la * np.sum(beta)
+        res = - (y - x @ beta) @ x + la * np.sum(beta)
         if np.isnan(np.sum(res)):
             print(y)
             print(x)
@@ -148,7 +153,7 @@ def cost_grad(y: np.array, x: np.array, beta: np.array, solver: str = "ols", la:
             sys.exit()
         return res
     elif solver == "logistic":
-        return (x@beta - y)/(x@beta - x@beta**2)
+        return (x @ beta - y) / (x @ beta - x @ beta ** 2)
 
 
 def create_grid(res: float) -> Tuple[np.array, np.array]:
@@ -234,7 +239,7 @@ def err_from_var(var: np.array, sample_size: int) -> np.array:
 
 def train(deg: int, solver: str = "ols", la: float = 1, epochs: int = 0, batches: int = 0,
           x: np.array = None, y: np.array = None, z: np.array = None, g0: float = 1e-3) \
-          -> Tuple[np.array, np.array, np.array, np.array, np.array]:
+        -> Tuple[np.array, np.array, np.array, np.array, np.array]:
     """
     Calculates fit based on given degree. If no data for x,y and z are given, data will be
     created from / for the franke function, otherwise the provided data will be used
@@ -258,7 +263,6 @@ def train(deg: int, solver: str = "ols", la: float = 1, epochs: int = 0, batches
     test_m = mse_error(test_z, predict(beta, test_x))
     train_r = r2_error(train_z, predict(beta, train_x))
     train_m = mse_error(train_z, predict(beta, train_x))
-    #print(test_r)
     return test_r, train_r, test_m, train_m, beta
 
 
@@ -343,33 +347,30 @@ def print_errors(x_values: np.array, errors: np.array, labels: list, name: str, 
         plt.yscale('log')
     if logx:
         plt.xscale('log')
-#    fig.tight_layout()
+    #    fig.tight_layout()
     fig.savefig("images/" + name + ".png", dpi=300)
     return fig
 
 
-def print_cont(deg: int, data: np.array, name: str, zlabel: str) -> Figure:
+def print_cont(x: np.array, y: np.array, data: np.array, name: str, x_label: str = "", y_label: str = "", z_label: str = "", task: str = "a") -> Figure:
     """
     Similar as above but for contour data where the axes depend on the degree of the polynome
-    :param deg: degree of the polynomial
+    :param x:
+    :param y:
     :param data: z-values
     :param name: filename
-    :param zlabel: label for z axis
+    :param z_label: label for z axis
     :return: the create figure
     """
-    # x axis is the parameter index
-    x = np.linspace(1, max_mat_len(deg), max_mat_len(deg))
-    # axis is the polynomial index
-    y = np.linspace(1, deg, deg)
     x, y = np.meshgrid(x, y)
     fig = plt.figure(figsize=(6, 6), dpi=300)
     ax = fig.gca(projection='3d')
     ax.plot_surface(x, y, data, cmap=cmaps.parula)
-    ax.set_xlabel("Parameter Index")
-    ax.set_ylabel("Polynomial Degree")
-    ax.set_zlabel(zlabel)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_zlabel(z_label)
     fig.tight_layout()
-    fig.savefig("images/" + name + ".png", dpi=300)
+    fig.savefig("images/" + task + name + ".png", dpi=300)
     return fig
 
 
@@ -420,129 +421,223 @@ def print_data() -> Figure:
 
 
 def loop_over_batches(deg: int, values: np.array,
-                             solver: str = "ridge", x: np.array = None, y: np.array = None,
-                             z: np.array = None, la: float = 1, epochs: int = 0, g0: float = 1e-3):
+                      solver: str = "ridge", x: np.array = None, y: np.array = None,
+                      z: np.array = None, la: float = 1, epochs: int = 0, g0: float = 1e-3):
     n = values.shape[0]
-    test_r = np.zeros(shape=(deg, n, epochs))
-    train_r = np.zeros(shape=(deg, n, epochs))
-    test_m = np.zeros(shape=(deg, n, epochs))
-    train_m = np.zeros(shape=(deg, n, epochs))
-    beta = np.zeros(shape=(deg, max_mat_len(deg), n, epochs))
+    test_r = np.zeros(shape=(n, epochs))
+    train_r = np.zeros(shape=(n, epochs))
+    test_m = np.zeros(shape=(n, epochs))
+    train_m = np.zeros(shape=(n, epochs))
+    beta = np.zeros(shape=(max_mat_len(deg), n, epochs))
     i = 0
     for v in values:
-        test_r[:, i, :], train_r[:, i, :], test_m[:, i, :], train_m[:, i, :], beta[:, :, i, :] = train_degs(
-            maxdeg=deg, epochs=epochs, batches=v,
+        test_r[i, :], train_r[i, :], test_m[i, :], train_m[i, :], beta[:, i, :] = train(
+            deg=deg, epochs=epochs, batches=v,
             solver=solver, la=la, x=x, y=y, z=z, g0=g0)
         i = i + 1
-    return test_r[:, :, -1], train_r[:, :, -1], test_m[:, :, -1], train_m[:, :, -1], beta[:, :, :, -1]
+    return test_r[:, -1], train_r[:, -1], test_m[:, -1], train_m[:, -1], beta[:, :, -1]
 
 
 def loop_over_epochs(deg: int, values: np.array,
-                             solver: str = "ridge", x: np.array = None, y: np.array = None,
-                             z: np.array = None, la: float = 1, batches: int = 0, g0:float = 1e-3):
+                     solver: str = "ridge", x: np.array = None, y: np.array = None,
+                     z: np.array = None, la: float = 1, batches: int = 0, g0: float = 1e-3):
     v = np.max(values)
-    test_r, train_r, test_m, train_m, beta = train_degs(maxdeg=deg, epochs=v, batches=batches,
-                                                        solver=solver, la=la, x=x, y=y, z=z, g0=g0)
+    test_r, train_r, test_m, train_m, beta = train(deg=deg, epochs=v, batches=batches,
+                                                   solver=solver, la=la, x=x, y=y, z=z, g0=g0)
     return test_r, train_r, test_m, train_m, beta
 
 
 def loop_over_lambda(deg: int, values: np.array,
-                             solver: str = "ridge", x: np.array = None, y: np.array = None,
-                             z: np.array = None, epochs: int = 0, batches: int = 0, g0:float = 1e-3):
+                     solver: str = "ridge", x: np.array = None, y: np.array = None,
+                     z: np.array = None, epochs: int = 0, batches: int = 0, g0: float = 1e-3):
     n = values.shape[0]
-    test_r = np.zeros(shape=(deg, n, epochs))
-    train_r = np.zeros(shape=(deg, n, epochs))
-    test_m = np.zeros(shape=(deg, n, epochs))
-    train_m = np.zeros(shape=(deg, n, epochs))
-    beta = np.zeros(shape=(deg, max_mat_len(deg), n, epochs))
+    test_r = np.zeros(shape=(n, epochs))
+    train_r = np.zeros(shape=(n, epochs))
+    test_m = np.zeros(shape=(n, epochs))
+    train_m = np.zeros(shape=(n, epochs))
+    beta = np.zeros(shape=(max_mat_len(deg), n, epochs))
     i = 0
     for v in values:
-        test_r[:, i, :], train_r[:, i, :], test_m[:, i, :], train_m[:, i, :], beta[:, :, i, :] = train_degs(
-            maxdeg=deg, epochs=epochs, batches=batches,
+        test_r[i, :], train_r[i, :], test_m[i, :], train_m[i, :], beta[:, i, :] = train(
+            deg=deg, epochs=epochs, batches=batches,
             solver=solver, la=v, x=x,
             y=y, z=z, g0=g0)
         i = i + 1
-    return test_r[:, :, -1], train_r[:, :, -1], test_m[:, :, -1], train_m[:, :, -1], beta[:, :, :, -1]
+    return test_r[:, -1], train_r[:, -1], test_m[:, -1], train_m[:, -1], beta[:, :, -1]
 
 
 def loop_over_learning_rate(deg: int, values: np.array,
-                           solver: str = "ridge", x: np.array = None, y: np.array = None,
-                           z: np.array = None, epochs: int = 0, batches: int = 0, la: float = 1):
+                            solver: str = "ridge", x: np.array = None, y: np.array = None,
+                            z: np.array = None, epochs: int = 0, batches: int = 0, la: float = 1):
     n = values.shape[0]
-    test_r = np.zeros(shape=(deg, n, epochs))
-    train_r = np.zeros(shape=(deg, n, epochs))
-    test_m = np.zeros(shape=(deg, n, epochs))
-    train_m = np.zeros(shape=(deg, n, epochs))
-    beta = np.zeros(shape=(deg, max_mat_len(deg), n, epochs))
+    test_r = np.zeros(shape=(n, epochs))
+    train_r = np.zeros(shape=(n, epochs))
+    test_m = np.zeros(shape=(n, epochs))
+    train_m = np.zeros(shape=(n, epochs))
+    beta = np.zeros(shape=(max_mat_len(deg), n, epochs))
     i = 0
     for v in values:
         print(v)
-        test_r[:, i, :], train_r[:, i, :], test_m[:, i, :], train_m[:, i, :], beta[:, :, i, :] = train_degs(
-            maxdeg=deg, epochs=epochs, batches=batches, solver=solver, la=la, x=x, y=y, z=z, g0=v)
+        test_r[i, :], train_r[i, :], test_m[i, :], train_m[i, :], beta[:, i, :] = train(
+            deg=deg, epochs=epochs, batches=batches, solver=solver, la=la, x=x, y=y, z=z, g0=v)
         i = i + 1
-    return test_r[:, :, -1], train_r[:, :, -1], test_m[:, :, -1], train_m[:, :, -1], beta[:, :, :, -1]
+    return test_r[:, -1], train_r[:, -1], test_m[:, -1], train_m[:, -1], beta[:, :, -1]
 
 
-def train_print_hyperparameter(deg: int, parameter: str, values: np.array,
-                               solver: str = "ridge", x: np.array = None, y: np.array = None,
-                               z: np.array = None, epochs: int = 0, batches: int = 0, la: float = 1,
-                               g0: float = 1e-3, task: str = "a", d: int = 6) -> None:
+def train_print_hyperparameter(deg: int, parameter: [str], solver: str = "ridge", x: np.array = None, y: np.array = None,
+                               z: np.array = None, epochv: [int] = np.array([0]), batchv: [int] = np.array([0]), lambdav: [float] = np.array([1]),
+                               lrv: [float] = np.array([1e-3]), task: str = "a", d: int = 6) -> None:
     """
     Wrapper function around "train_degs", that is able to handle different parameters for ridge and
     lasso and automatically prints the resulting diagrams.
-    :param deg: maximum degree for which to train
-    :param solver: ridge or lasso
-    :param x: x vector
-    :param y: y vector
-    :param z: z vector
-    :param task: task this belongs to, to sort the figures into the correct folder
-    :return: None
+    :param deg:
+    :param parameter:
+    :param values:
+    :param solver:
+    :param x:
+    :param y:
+    :param z:
+    :param epochv:
+    :param batchv:
+    :param lambdav:
+    :param lrv:
+    :param task:
+    :param d:
+    :return:
     """
-    if parameter == "epoch":
-        test_r, train_r, test_m, train_m, beta = loop_over_epochs(deg=deg, values=values,
-                                                                  solver=solver, x=x, y=y, z=z,
-                                                                  la=la, batches=batches, g0=g0)
-    elif parameter == "batch":
-        test_r, train_r, test_m, train_m, beta = loop_over_batches(deg=deg, values=values,
-                                                                   solver=solver, x=x, y=y, z=z,
-                                                                   epochs=epochs, la=la, g0=g0)
-    elif parameter == "lambda":
-        test_r, train_r, test_m, train_m, beta = loop_over_lambda(deg=deg, values=values,
-                                                                  solver=solver, x=x, y=y, z=z,
-                                                                  epochs=epochs, batches=batches, g0=g0)
-    elif parameter == "learning_rate":
-        test_r, train_r, test_m, train_m, beta = loop_over_learning_rate(deg=deg, values=values,
-                                                                  solver=solver, x=x, y=y, z=z,
-                                                                  epochs=epochs, batches=batches, la=la)
-    else:
-        print("invalid parameter given")
-        sys.exit(-2)
-    # refactoring shape of error and label vectors
-    errors = np.append(test_m, train_m, axis=0)
-    labels = [[], []]
-    for i in range(deg):
-        labels[0].extend(["test MSE" + str(i + 1)])
-        labels[1].extend(["train MSE" + str(i + 1)])
-    # https://stackoverflow.com/a/952952
-    labels = [item for sublist in labels for item in sublist]
-    # plotting mean squared error
-    if parameter=="lambda" or parameter == "learning_rate":
-        logx = True
-    else:
-        logx = False
-    print_errors(values, errors, labels,
-                 task + "/" + solver + "_mse_parameter_"+parameter, logx=logx, logy=True,
-                 xlabel=parameter, d=d, ylabel="mean squared error")
-    errors = np.append(test_r, train_r, axis=0)
-    labels = [[], []]
-    for i in range(deg):
-        labels[0].extend(["test R^2 " + str(i + 1)])
-        labels[1].extend(["train R^2 " + str(i + 1)])
-    labels = [item for sublist in labels for item in sublist]
-    print_errors(values, errors, labels,
-                 task + "/" + solver + "_r_squared_parameter_"+parameter, logx=logx, logy=True,
-                 xlabel=parameter, d=d, ylabel="R^2 value")
 
+    """batchv = np.array([])
+    epochv = []
+    lambdav= []
+    lrv = []"""
+    #lrv = np.array([1e-3, 2e-3])
+    ba_n = batchv.size
+    ep_n = epochv.size
+    la_n = lambdav.size
+    lr_n = lrv.size
+    b_c = 0
+    lr_c = 0
+    la_c = 0
+    N = ba_n*ep_n*la_n*lr_n
+    test_r = np.zeros(shape=(ep_n, ba_n, lr_n, la_n))
+    train_r = np.zeros(shape=(ep_n, ba_n, lr_n, la_n))
+    test_m = np.zeros(shape=(ep_n, ba_n, lr_n, la_n))
+    train_m = np.zeros(shape=(ep_n, ba_n, lr_n, la_n))
+    beta = np.zeros(shape=(max_mat_len(deg), ep_n, ba_n, lr_n, la_n))
+
+    print("testing " + str(N) + " combinations of parameters")
+    e = ep_n
+    i = 0
+    pb = ProgressBar(total=N/100, prefix='', suffix='', decimals=3,
+                     length=50, fill='=',
+                     zfill='>')
+    pb.print_progress_bar(i)
+    for b, l, s in it.product(batchv, lrv, lambdav):
+        p1, p2, p3, p4, p5 = train(deg=deg, solver=solver, la=s, epochs=e, batches=b, x=x,
+                                          y=y, z=z, g0=l)
+        test_r[:, b_c, lr_c] = np.expand_dims(p1, axis=1)
+        train_r[:, b_c, lr_c] = np.expand_dims(p2, axis=1)
+        test_m[:, b_c, lr_c] = np.expand_dims(p3, axis=1)
+        train_m[:, b_c, lr_c] = np.expand_dims(p4, axis=1)
+        beta[:, :, b_c, lr_c] = np.expand_dims(p5, axis=2)
+        la_c += 1
+        if la_c == la_n:
+            la_c = 0
+            lr_c += 1
+            if lr_c == lr_n:
+                lr_c = 0
+                b_c += 1
+        i += 1
+        pb.print_progress_bar(i)
+    ref = ["epoch", "batch", "learning_rate", "lambda"]
+    if len(parameter) == 1:
+        parameter = parameter[0]
+        i = ref.index(parameter)
+        if i == 0:
+            values = np.linspace(1, ep_n, ep_n, dtype=int)
+        elif i == 1:
+            values = batchv
+        elif i == 2:
+            values = lrv
+        elif i == 3:
+            values = lambdav
+        if i != 0:
+            errors_test_m = np.transpose(np.squeeze(np.append(np.moveaxis(test_m[-1, :, :, :], i-1, 0)[:], np.moveaxis(test_m[-1, :, :, :], i-1, 0)[:], axis=1)))
+            errors_test_r = np.transpose(np.squeeze(np.append(np.moveaxis(test_r[-1, :, :, :], i-1, 0)[:], np.moveaxis(test_r[-1, :, :, :], i-1, 0)[:], axis=1)))
+            errors_train_m = np.transpose(np.squeeze(np.append(np.moveaxis(train_m[-1, :, :, :], i-1, 0)[:], np.moveaxis(train_m[-1, :, :, :], i-1, 0)[:], axis=1)))
+            errors_train_r = np.transpose(np.squeeze(np.append(np.moveaxis(train_r[-1, :, :, :], i-1, 0)[:], np.moveaxis(train_r[-1, :, :, :], i-1, 0)[:], axis=1)))
+
+        labels_m = ["test MSE", "train MSE"]
+        labels_r = ["test R^2", "train R^2"]
+        # plotting mean squared error
+        if parameter == "lambda" or parameter == "learning_rate":
+            logx = True
+        else:
+            logx = False
+        print_errors(values, errors_test_m, labels_m,
+                     task + "/" + solver + "_mse_test_parameter_" + parameter, logx=logx, logy=True,
+                     xlabel=parameter, d=d, ylabel="mean squared error")
+        print_errors(values, errors_test_r, labels_r,
+                     task + "/" + solver + "_r_squared_test_parameter_" + parameter, logx=logx, logy=True,
+                     xlabel=parameter, d=d, ylabel="R^2 value")
+        print_errors(values, errors_train_m, labels_m,
+                     task + "/" + solver + "_mse_train_parameter_" + parameter, logx=logx, logy=True,
+                     xlabel=parameter, d=d, ylabel="mean squared error")
+        print_errors(values, errors_train_r, labels_r,
+                     task + "/" + solver + "_r_squared_train_parameter_" + parameter, logx=logx,
+                     logy=True,
+                     xlabel=parameter, d=d, ylabel="R^2 value")
+    elif len(parameter) == 2:
+        par1 = parameter[0]
+        par2 = parameter[1]
+        i = ref.index(par1)
+        val1 = []
+        if i == 0:
+            val1 = np.linspace(1, ep_n, ep_n, dtype=int)
+        elif i == 1:
+            val1 = batchv
+        elif i == 2:
+            val1 = lrv
+        elif i == 3:
+            val1 = lambdav
+        j = ref.index(par2)
+        val2 = []
+        if j == 0:
+            val2 = np.linspace(1, ep_n, ep_n, dtype=int)
+        elif j == 1:
+            val2 = batchv
+        elif j == 2:
+            val2 = lrv
+        elif j == 3:
+            val2 = lambdav
+        if i != 0 and j != 0:
+            data_m_train = np.squeeze(np.moveaxis(np.moveaxis(train_m[-1, :, :, :], j-1, 0), i-1, 0), axis=(2))
+            data_m_test = np.squeeze(np.moveaxis(np.moveaxis(test_m[-1, :, :, :], j-1, 0), i-1, 0), axis=(2))
+            data_r_train = np.squeeze(np.moveaxis(np.moveaxis(train_r[-1, :, :, :], j-1, 0), i-1, 0), axis=(2))
+            data_r_test = np.squeeze(np.moveaxis(np.moveaxis(test_r[-1, :, :, :], j-1, 0), i-1, 0), axis=(2))
+        else:
+            data_m_train = np.squeeze(np.moveaxis(np.moveaxis(train_m[:, :, :, :], j, 0), i, 0), axis=(2, 3))
+            data_m_test = np.squeeze(np.moveaxis(np.moveaxis(test_m[:, :, :, :], j, 0), i, 0), axis=(2, 3))
+            data_r_train = np.squeeze(np.moveaxis(np.moveaxis(train_r[:, :, :, :], j, 0), i, 0), axis=(2, 3))
+            data_r_test = np.squeeze(np.moveaxis(np.moveaxis(test_r[:, :, :, :], j, 0), i, 0), axis=(2, 3))
+        print_cont(x=val2, y=val1, data=data_m_train, name="_".join(parameter), z_label="train_Data_mse", x_label=par2, y_label=par1, task=task)
+        print_cont(x=val2, y=val1, data=data_m_test, name="_".join(parameter), z_label="test_Data_mse", x_label=par2, y_label=par1, task=task)
+        print_cont(x=val2, y=val1, data=data_r_train, name="_".join(parameter), z_label="train_Data_r_squared", x_label=par2, y_label=par1, task=task)
+        print_cont(x=val2, y=val1, data=data_r_test, name="_".join(parameter), z_label="test_Data_r_squared", x_label=par2, y_label=par1, task=task)
+    else:
+        pass
+    min_ind_train = np.unravel_index(np.argmin(train_m), train_m.shape)
+    min_ind_test = np.unravel_index(np.argmin(test_m), test_m.shape)
+    print("training mean squared error:" + str(train_m[min_ind_train]))
+    print("epochs: " + str(epochv[min_ind_train[0]]))
+    print("batches: " + str(batchv[min_ind_train[1]]))
+    print("learning rate: " + str(lrv[min_ind_train[2]]))
+    print("lambda: " + str(lambdav[min_ind_train[3]]))
+    print("testing mean squared error:" + str(test_m[min_ind_test]))
+    print("epochs: " + str(epochv[min_ind_test[0]]))
+    print("batches: " + str(batchv[min_ind_test[1]]))
+    print("learning rate: " + str(lrv[min_ind_test[2]]))
+    print("lambda: " + str(lambdav[min_ind_test[3]]))
 
 def train_print_single_lambda(deg: int, epochs: int, batches: int, la: float = 0,
                               solver: str = "ridge", x: np.array = None, y: np.array = None,
@@ -585,9 +680,12 @@ def task_a():
     epochs = EPOCHS
     batches = BATCHES
     g0 = LEARNING_RATE
-    test_r, train_r, test_m, train_m, beta = train_degs(deg, epochs=epochs, batches=batches, g0=g0)
-    print_cont(deg, beta[:, :, -1], "a/ols_betas_epochs_" + str(epochs) + "_batches_" + str(batches),
-               "Parameter values")
+    """test_r, train_r, test_m, train_m, beta = train_degs(deg, epochs=epochs, batches=batches, g0=g0)
+    x = np.linspace(1, max_mat_len(deg), max_mat_len(deg))
+    y = np.linspace(1, deg, deg)
+    print_cont(x, y, beta[:, :, -1],
+               "a/ols_betas_epochs_" + str(epochs) + "_batches_" + str(batches),
+               z_label = "Parameter values, x_label = "Parameter Index", y_label = "Polynomial Degree")
     errors = [test_m[:, -1], train_m[:, -1]]
     labels = ["test MSE", "train MSE"]
     print_errors(np.linspace(1, deg, deg), errors, labels,
@@ -597,16 +695,18 @@ def task_a():
     labels = ["test R^2", "train R^2"]
     print_errors(np.linspace(1, deg, deg), errors, labels,
                  "a/ols_R_squared_epochs_" + str(epochs) + "_batches_" + str(batches),
-                 ylabel="R^2 value", d=4)
+                 ylabel="R^2 value", d=4)"""
     deg = 10
-    minorder = -6
-    maxorder = 0
+    minorder = -4
+    maxorder = 4
+    epochs = np.linspace(1, epochs, epochs, dtype=int)
+    batches = np.linspace(1, batches, batches, dtype=int)
     order = np.array([minorder, maxorder])
     n = int(np.linalg.norm(order, 1) * 10)
     lrs = np.logspace(order[0], order[1], num=n)
-    train_print_hyperparameter(deg=deg, values=lrs, parameter="learning_rate",
-                               solver="ols", epochs=epochs, batches=batches, task="a", d=6)
-    g0 = 2e-3
+    train_print_hyperparameter(deg=deg, parameter=["learning_rate", "batch", "epoch"], lrv=lrs,
+                               solver="ols", epochv=epochs, batchv=batches, task="a", d=6)
+    """g0 = 2e-3
     btchs = np.linspace(1, 50, 50, dtype=int)
     train_print_hyperparameter(deg=deg, values=btchs, parameter="batch", g0=g0,
                                solver="ols", epochs=epochs, task="a", d=6)
@@ -621,9 +721,7 @@ def task_a():
     n = int(np.linalg.norm(order, 1) * 5)
     lambdas = np.logspace(order[0], order[1], num=n)
     train_print_hyperparameter(deg=deg, values=lambdas, parameter="lambda", g0=g0,
-                               solver="ridge", epochs=epochs, batches=batches, task="a", d=6)
-
-
+                               solver="ridge", epochs=epochs, batches=batches, task="a", d=6)"""
 
 
 NOISE_LEVEL = 0.1
