@@ -173,12 +173,12 @@ x = digits.data
 t = digits.target
 n_in = x.shape[1]
 n_out = 10
-n_middle = 8
-epochs = 500
-batch_size = 25
+n_middle = 64
+epochs = 250
+batch_size = 100
 y = np.zeros(shape=(x.shape[0], n_out))
 y[np.arange(t.size), t] = 1
-split_size = 0.8
+split_size = 0.95
 x = (x-np.max(x)/2)/(np.max(x)/2)
 #x = scale(x, axis=1)
 
@@ -191,16 +191,16 @@ x = (x-np.max(x)/2)/(np.max(x)/2)
 #ny = np.expand_dims(ny, axis=1)
 #x_train, x_test, y_train, y_test = train_test_split(nx, ny, train_size=split_size)
 x_train, x_test, y_train, y_test = train_test_split(x, y, train_size=split_size)
-learning_rate = 0.001
+learning_rate = 0.0001
 
 l_in = LayerDense(n_in, n_middle, "lin", learning_rate, Costfunctions.mse,
-                  ActivationFunctions.relu)
+                  ActivationFunctions.sigmoid)
 l_mi = LayerDense(n_middle, n_middle, "lmi", learning_rate, Costfunctions.mse,
                   ActivationFunctions.sigmoid)
 l_mi2 = LayerDense(n_middle, n_middle, "lmi2", learning_rate, Costfunctions.mse,
                   ActivationFunctions.sigmoid)
 l_ou = LayerDense(n_middle, n_out, "lmi", learning_rate, Costfunctions.mse,
-                  ActivationFunctions.relu)
+                  ActivationFunctions.softmax)
 network = Network([l_in, l_ou], "mnist")
 network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
 

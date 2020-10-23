@@ -29,11 +29,25 @@ class Costfunctions:
 
     @staticmethod
     def cross_entropy(y_true, y_pred, l):
+        #print(y_true)
+        #print(y_pred)
+        #print(np.sum(-y_true*np.log(y_pred), axis=0))
+        #print(y_true.shape)
+        #print(y_pred.shape)
+        #print(np.sum(-y_true*np.log(y_pred), axis=0).shape)
+        #print(np.max(np.sum(-y_true*np.log(y_pred), axis=0)))
         return np.sum(-y_true*np.log(y_pred), axis=0)
 
     @staticmethod
     def cross_entropy_grad(y_true, y_pred, l):
-        return y_true/y_pred
+        #print(y_true)
+        #print(y_pred)
+        #print(y_true.shape)
+        #print(y_pred.shape)
+        #print((-y_true/y_pred).shape)
+        #print(-y_true/y_pred)
+        print(np.max(np.abs(-y_true/y_pred + (1-y_true)/(1-y_pred))))
+        return -y_true/y_pred - (1-y_true)/(1-y_pred)
 
     @staticmethod
     def soft_max(y_true, y_pred, l):
