@@ -174,7 +174,7 @@ t = digits.target
 n_in = x.shape[1]
 n_out = 10
 n_middle = 8
-epochs = 25
+epochs = 500
 batch_size = 25
 y = np.zeros(shape=(x.shape[0], n_out))
 y[np.arange(t.size), t] = 1
@@ -182,15 +182,15 @@ split_size = 0.8
 x = (x-np.max(x)/2)/(np.max(x)/2)
 #x = scale(x, axis=1)
 
-nx = x[t == 0, :]
-nx = np.append(nx, x[t == 1, :], axis=0)
-ny = y[t == 0, 0:2]
-ny = np.append(ny, y[t == 1, 0:2], axis=0)
-n_out = 2
+#nx = x[t == 0, :]
+#nx = np.append(nx, x[t == 1, :], axis=0)
+#ny = y[t == 0, 0:2]
+#ny = np.append(ny, y[t == 1, 0:2], axis=0)
+#n_out = 2
 #ny = ny[:, 0]
 #ny = np.expand_dims(ny, axis=1)
-
-x_train, x_test, y_train, y_test = train_test_split(nx, ny, train_size=split_size)
+#x_train, x_test, y_train, y_test = train_test_split(nx, ny, train_size=split_size)
+x_train, x_test, y_train, y_test = train_test_split(x, y, train_size=split_size)
 learning_rate = 0.001
 
 l_in = LayerDense(n_in, n_middle, "lin", learning_rate, Costfunctions.mse,
@@ -199,8 +199,8 @@ l_mi = LayerDense(n_middle, n_middle, "lmi", learning_rate, Costfunctions.mse,
                   ActivationFunctions.sigmoid)
 l_mi2 = LayerDense(n_middle, n_middle, "lmi2", learning_rate, Costfunctions.mse,
                   ActivationFunctions.sigmoid)
-l_ou = LayerDense(n_middle, n_out, "lmi", learning_rate, Costfunctions.cross_entropy,
-                  ActivationFunctions.softmax)
+l_ou = LayerDense(n_middle, n_out, "lmi", learning_rate, Costfunctions.mse,
+                  ActivationFunctions.relu)
 network = Network([l_in, l_ou], "mnist")
 network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
 
@@ -213,12 +213,14 @@ out_1=network.layers[1].output
 
 r_test = network.predict(x_test.T)
 r_train = network.predict(x_train.T)
-acc_test = np.sum(np.abs(r_test - y_test.T) <= 0.1)/r_test.shape[1]
-acc_train = np.sum(np.abs(r_train - y_train.T) <= 0.1)/r_train.shape[1]
+acc_test = np.sum(np.abs(r_test - y_test.T) <= 0.1 * (y_test.T != 0))/r_test.shape[1]
+acc_train = np.sum(np.abs(r_train - y_train.T) <= 0.1 * (y_train.T != 0))/r_train.shape[1]
 print(acc_test, acc_train)
 #print(y_test.T)
 #print(r_test)
 
+r_test = pred_to_class(network.predict(x_test.T))
+r_train = pred_to_class(network.predict(x_train.T))
 y_test_c = pred_to_class(y_test.T)
 y_train_c = pred_to_class(y_train.T)
 acc_test = np.sum(r_test == y_test_c)/r_test.shape[0]
