@@ -9,7 +9,7 @@ from regression import task_a, create_grid, RESOLUTION, franke, NOISE_LEVEL, mse
     print_errors
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
-from network import LayerDense, Costfunctions, ActivationFunctions, Network
+from network import LayerDense, Costfunctions, ActivationFunctions, Metrics, Network
 import numpy as np
 
 from sklearn import datasets
@@ -37,7 +37,7 @@ def create_terrain_data():
     return x_train, x_test, y_train, y_test
 
 
-def print_cost_by_network_and_epoch(num_epochs, cost, task, name):
+def print_metrik_by_network_and_epoch(num_epochs, cost, task, name, metric_name):
     fig = plt.figure(figsize=(6, 6), dpi=300)
     if len(cost) == 2:
         plt.plot(np.linspace(0, num_epochs, num_epochs+1), cost[0], label="train", linestyle="--")
@@ -48,7 +48,7 @@ def print_cost_by_network_and_epoch(num_epochs, cost, task, name):
     plt.grid()
     ax = fig.gca()
     ax.set_xlabel("epochs")
-    ax.set_ylabel("Value of cost function")
+    ax.set_ylabel(metric_name)
     plt.yscale('log')
     fig.tight_layout()
     fig.savefig("images/" + task + "/" + name + ".png", dpi=300)
@@ -173,9 +173,9 @@ x = digits.data
 t = digits.target
 n_in = x.shape[1]
 n_out = 10
-n_middle = 64
-epochs = 50
-batch_size = 20
+n_middle = 256
+epochs = 100
+batch_size = 10
 y = np.zeros(shape=(x.shape[0], n_out))
 y[np.arange(t.size), t] = 1
 split_size = 0.8
@@ -191,7 +191,7 @@ x = (x-np.max(x)/2)/(np.max(x)/2)
 #ny = np.expand_dims(ny, axis=1)
 #x_train, x_test, y_train, y_test = train_test_split(nx, ny, train_size=split_size)
 x_train, x_test, y_train, y_test = train_test_split(x, y, train_size=split_size)
-learning_rate = 0.01
+learning_rate = 0.001
 
 l_in = LayerDense(n_in, n_middle, "lin", learning_rate, Costfunctions.mse,
                   ActivationFunctions.elu)
@@ -201,7 +201,7 @@ l_mi2 = LayerDense(n_middle, n_middle, "lmi2", learning_rate, Costfunctions.mse,
                   ActivationFunctions.sigmoid)
 l_ou = LayerDense(n_middle, n_out, "lou", learning_rate, Costfunctions.cross_entropy,
                   ActivationFunctions.softmax)
-network = Network([l_in, l_mi2, l_ou], "mnist")
+network = Network([l_in, l_mi2, l_ou], "mnist", Metrics.accuracy)
 network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
 
 out_0=network.layers[0].output
@@ -229,9 +229,9 @@ print(acc_test, acc_train)
 
 
 
-print("Cost function after initialization, after first epoch and last epoch ")
-print(network.train_C[0], network.train_C[1], network.train_C[-1])
-print_cost_by_network_and_epoch(epochs, [network.train_C, network.test_C], "d", "own_"+network.name+"_elu")
+print("Metric after initialization, after first epoch and last epoch ")
+print(network.train_M[0], network.train_M[1], network.train_M[-1])
+print_metrik_by_network_and_epoch(epochs, [network.train_M, network.test_M], "d", "own_"+network.name+"_elu", "accuracy")
 
 
 #task_b_own()

@@ -8,6 +8,23 @@ from console_progressbar import ProgressBar
 RANDOM_SEED = 1337
 
 
+class Metrics:
+    @staticmethod
+    def pred_to_class(y):
+        r = np.argmax(y, axis=0)
+        return r
+
+    @staticmethod
+    def accuracy(y_true, y_pred):
+        y_true = Metrics.pred_to_class(y_true)
+        y_pred = Metrics.pred_to_class(y_pred)
+        return np.sum(y_true == y_pred) / y_true.__len__()
+
+    @staticmethod
+    def mse(y_true, y_pred):
+        return Costfunctions.mse(y_true, y_pred, None)
+
+
 class Costfunctions:
     la = 0.1
     eps = 1e-15
@@ -236,27 +253,29 @@ class LayerDense(Layer):
 
 
 class Network:
-    def __init__(self, layers: List[Layer], name: str):
+    def __init__(self, layers: List[Layer], name: str, mf):
         self.layers = layers
-        self.train_C = []
-        self.test_C = []
+        self.train_M = []
+        self.test_M = []
         self.name = name
+        self.mf = mf
         np.random.seed(RANDOM_SEED)
 
     def train(self, x, y, epochs, batch_size, x_test, y_test):
-        self.train_C = []
+        #self.train_C = []
         batches = int(np.floor(x.shape[1] / batch_size))
         p = 0
         pb = ProgressBar(total=epochs, prefix='', suffix='', decimals=3,
                          length=50, fill='=',
                          zfill='>')
-        self.forward_pass(x)
-        l = (np.sum(np.abs(self.layers[-1].weights), axis=1) + np.abs(self.layers[-1].biases.T)).T
-        error = self.layers[-1].cost_function(y, self.layers[-1].output, l)
-        self.train_C.append(np.sum(error))
-        self.forward_pass(x_test)
-        error = self.layers[-1].cost_function(y_test, self.layers[-1].output, l)
-        self.test_C.append(np.sum(error))
+        #self.forward_pass(x)
+        #l = (np.sum(np.abs(self.layers[-1].weights), axis=1) + np.abs(self.layers[-1].biases.T)).T
+        #error = self.layers[-1].cost_function(y, self.layers[-1].output, l)
+        #self.train_C.append(np.sum(error))
+        #self.forward_pass(x_test)
+        #error = self.layers[-1].cost_function(y_test, self.layers[-1].output, l)
+        self.train_M.append(self.metric(y, self.predict(x)))
+        self.test_M.append(self.metric(y_test, self.predict(x_test)))
         pb.print_progress_bar(p)
         for i in range(epochs):
             for j in range(batches):
@@ -265,17 +284,19 @@ class Network:
                 self.forward_pass(xn)
                 l = (np.sum(np.abs(self.layers[-1].weights), axis=1) + np.abs(self.layers[-1].biases.T)).T
                 #print(l)
-                error = self.layers[-1].cost_function(yn, self.layers[-1].output, l)
+                #error = self.layers[-1].cost_function(yn, self.layers[-1].output, l)
                 #print(error)
                 #sys.exit()
                 #print(np.max(self.layers[-1].cost_grad(yn, self.layers[-1].output, l)))
                 self.backward_pass(self.layers[-1].cost_grad(yn, self.layers[-1].output, l))
                 lr = self.layers[-1].initial_learning_rate / (i*batches+j+1)
                 #self.adapt_learning_rate(lr)
-            self.train_C.append(np.sum(error))
+            self.train_M.append(self.metric(y, self.predict(x)))
+            self.test_M.append(self.metric(y_test, self.predict(x_test)))
+            #self.train_C.append(np.sum(error))
             #self.forward_pass(x_test)
             #error = self.layers[-1].cost_function(y_test, self.layers[-1].output, l)
-            self.test_C.append(np.sum(error))
+            #self.test_C.append(np.sum(error))
             self.inc_epoch()
             p += 1
             pb.print_progress_bar(p)
@@ -301,3 +322,6 @@ class Network:
         pass
         #for layer in self.layers:
         #    layer.learning_rate = lr
+
+    def metric(self, y_true, y_pred):
+        return self.mf(y_true, y_pred)
