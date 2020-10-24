@@ -174,11 +174,11 @@ t = digits.target
 n_in = x.shape[1]
 n_out = 10
 n_middle = 64
-epochs = 250
-batch_size = 100
+epochs = 50
+batch_size = 20
 y = np.zeros(shape=(x.shape[0], n_out))
 y[np.arange(t.size), t] = 1
-split_size = 0.95
+split_size = 0.8
 x = (x-np.max(x)/2)/(np.max(x)/2)
 #x = scale(x, axis=1)
 
@@ -191,24 +191,32 @@ x = (x-np.max(x)/2)/(np.max(x)/2)
 #ny = np.expand_dims(ny, axis=1)
 #x_train, x_test, y_train, y_test = train_test_split(nx, ny, train_size=split_size)
 x_train, x_test, y_train, y_test = train_test_split(x, y, train_size=split_size)
-learning_rate = 0.0001
+learning_rate = 0.01
 
 l_in = LayerDense(n_in, n_middle, "lin", learning_rate, Costfunctions.mse,
-                  ActivationFunctions.sigmoid)
+                  ActivationFunctions.elu)
 l_mi = LayerDense(n_middle, n_middle, "lmi", learning_rate, Costfunctions.mse,
-                  ActivationFunctions.sigmoid)
+                  ActivationFunctions.elu)
 l_mi2 = LayerDense(n_middle, n_middle, "lmi2", learning_rate, Costfunctions.mse,
                   ActivationFunctions.sigmoid)
-l_ou = LayerDense(n_middle, n_out, "lmi", learning_rate, Costfunctions.mse,
+l_ou = LayerDense(n_middle, n_out, "lou", learning_rate, Costfunctions.cross_entropy,
                   ActivationFunctions.softmax)
-network = Network([l_in, l_ou], "mnist")
+network = Network([l_in, l_mi2, l_ou], "mnist")
 network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
 
 out_0=network.layers[0].output
 out_1=network.layers[1].output
+out_2=network.layers[2].output
+#out_3=network.layers[3].output
 #print(network.layers[0].output)
 #print(network.layers[1].output)
-
+r_test = pred_to_class(network.predict(x_test.T))
+r_train = pred_to_class(network.predict(x_train.T))
+y_test_c = pred_to_class(y_test.T)
+y_train_c = pred_to_class(y_train.T)
+acc_test = np.sum(r_test == y_test_c)/r_test.shape[0]
+acc_train = np.sum(r_train == y_train_c)/r_train.shape[0]
+print(acc_test, acc_train)
 
 
 r_test = network.predict(x_test.T)
@@ -219,13 +227,7 @@ print(acc_test, acc_train)
 #print(y_test.T)
 #print(r_test)
 
-r_test = pred_to_class(network.predict(x_test.T))
-r_train = pred_to_class(network.predict(x_train.T))
-y_test_c = pred_to_class(y_test.T)
-y_train_c = pred_to_class(y_train.T)
-acc_test = np.sum(r_test == y_test_c)/r_test.shape[0]
-acc_train = np.sum(r_train == y_train_c)/r_train.shape[0]
-print(acc_test, acc_train)
+
 
 print("Cost function after initialization, after first epoch and last epoch ")
 print(network.train_C[0], network.train_C[1], network.train_C[-1])

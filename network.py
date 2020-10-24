@@ -10,6 +10,7 @@ RANDOM_SEED = 1337
 
 class Costfunctions:
     la = 0.1
+    eps = 1e-15
 
     @staticmethod
     def mse(y_true, y_pred, l):
@@ -36,18 +37,35 @@ class Costfunctions:
         #print(y_pred.shape)
         #print(np.sum(-y_true*np.log(y_pred), axis=0).shape)
         #print(np.max(np.sum(-y_true*np.log(y_pred), axis=0)))
-        return np.sum(-y_true*np.log(y_pred), axis=0)
+        y_pred = y_pred + Costfunctions.eps
+        #print(y_true)
+        #print(y_pred)
+        #print(-np.sum(y_true*np.log(y_pred) +
+        #               (1-y_true)*np.log(1-y_pred), axis=0))
+        #print(y_pred.shape)
+        #print("sum")
+        #print(np.nansum(y_true*np.log(y_pred) + (1-y_true)*np.log(1-y_pred), axis=0).shape)
+        return -np.nansum(y_true*np.log(y_pred) + (1-y_true)*np.log(1-y_pred), axis=0)
 
     @staticmethod
     def cross_entropy_grad(y_true, y_pred, l):
+        #print(y_true.shape)
+        #y_true = np.array([[0, 1, 0, 1, 0], [0, 0, 1, 0, 0], [1, 0, 0, 0, 1]])
+        #y_pred = np.array([[0, 0.4, 0.3, 0.1, 0], [0.2, 0.4, 0.4, 0.2, 0], [0.8, 0.2, 0.3, 0.7, 1]])
+        #eps = 1e-15
+        y_pred = y_pred+Costfunctions.eps
         #print(y_true)
         #print(y_pred)
         #print(y_true.shape)
         #print(y_pred.shape)
         #print((-y_true/y_pred).shape)
         #print(-y_true/y_pred)
-        print(np.max(np.abs(-y_true/y_pred + (1-y_true)/(1-y_pred))))
-        return -y_true/y_pred - (1-y_true)/(1-y_pred)
+        #print(np.max(np.abs(-y_true/y_pred + (1-y_true)/(1-y_pred))))
+        #(2*y_true-1)*(1-1/y_pred)
+        #print(- (y_true - y_true/y_pred + ((1-y_true)+(1-y_true)/(1-y_pred))))
+        #sys.exit()
+        #print(- (y_true - y_true/y_pred + ((1-y_true)+(1-y_true)/(1-y_pred))))
+        return - (y_true - y_true/y_pred + ((1-y_true)+(1-y_true)/(1-y_pred)))
 
     @staticmethod
     def soft_max(y_true, y_pred, l):
@@ -199,8 +217,6 @@ class LayerDense(Layer):
 
     def backwards(self, error):
         self.error = error
-        #print(error.shape)
-        #print(self.name)
         next_error = np.matmul(self.weights.T, self.error) * self.activation_grad(self.x)
         b_grad = self.bias_grad()
         w_grad = self.weight_grad()
