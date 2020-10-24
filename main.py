@@ -203,38 +203,33 @@ def task_d():
     print_metrik_by_network_and_epoch(epochs, [network.get_train_met()[:,1], network.get_test_met()[:,1]], "d", "acc_own_"+"_".join([network.name,"epochs",str(epochs),"lr",str(learning_rate),"nodes",str(n_middle),"batch_size",str(batch_size)]), "accuracy")
 
 
+def task_e():
+    x_train, x_test, y_train, y_test = prepare_digit_data()
+    n_out = 10
+    n_in = x_train.shape[1]
+    n_middle = 256
+    learning_rate = 0.0001
+    epochs = 250
+    batch_size = 100
 
-task_d()
+    l_in = LayerDense(n_in, n_middle, "lin", learning_rate, Costfunctions.mse,
+                      ActivationFunctions.elu)
+    l_mi = LayerDense(n_middle, n_middle, "lmi", learning_rate, Costfunctions.mse,
+                      ActivationFunctions.sigmoid)
+    l_ou = LayerDense(n_middle, n_out, "lou", learning_rate, Costfunctions.mse,
+                      ActivationFunctions.softmax)
+    network = Network([l_in, l_mi, l_ou], "mnist", [Metrics.ce, Metrics.accuracy, Metrics.ce_grad])
+    network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
+    network.layers[-1].cf=Costfunctions.cross_entropy
+    network.layers[-1].cf_grad=Costfunctions.cross_entropy_grad
+    network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
 
-"""
-x_train, x_test, y_train, y_test = prepare_digit_data()
-n_out = 10
-n_in = x_train.shape[1]
-n_middle = 256
-learning_rate = 0.0001
-epochs = 250
-batch_size = 100
+    print("Metric after initialization, after first epoch and last epoch ")
+    print(network.get_train_met()[0,:], network.get_train_met()[1,:], network.get_train_met()[-1,:])
+    print_metrik_by_network_and_epoch(epochs*2+1, [network.get_train_met()[:,0], network.get_test_met()[:,0]], "e", "cre_own_"+"_".join([network.name,"epochs",str(epochs),"lr",str(learning_rate),"nodes",str(n_middle),"batch_size",str(batch_size)]), "entropy")
+    print_metrik_by_network_and_epoch(epochs*2+1, [network.get_train_met()[:,1], network.get_test_met()[:,1]], "e", "acc_own_"+"_".join([network.name,"epochs",str(epochs),"lr",str(learning_rate),"nodes",str(n_middle),"batch_size",str(batch_size)]), "accuracy")
+    print_metrik_by_network_and_epoch(epochs*2+1, [network.get_train_met()[:,2], network.get_test_met()[:,2]], "e", "ceg_own_"+"_".join([network.name,"epochs",str(epochs),"lr",str(learning_rate),"nodes",str(n_middle),"batch_size",str(batch_size)]), "ent grad")
 
-l_in = LayerDense(n_in, n_middle, "lin", learning_rate, Costfunctions.mse,
-                  ActivationFunctions.elu)
-l_mi = LayerDense(n_middle, n_middle, "lmi", learning_rate, Costfunctions.mse,
-                  ActivationFunctions.elu)
-l_mi2 = LayerDense(n_middle, n_middle, "lmi2", learning_rate, Costfunctions.mse,
-                  ActivationFunctions.sigmoid)
-l_ou = LayerDense(n_middle, n_out, "lou", learning_rate, Costfunctions.mse,
-                  ActivationFunctions.softmax)
-network = Network([l_in, l_mi2, l_ou], "mnist", [Metrics.ce, Metrics.accuracy, Metrics.ce_grad])
-network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
-network.layers[-1].cf=Costfunctions.cross_entropy
-network.layers[-1].cf_grad=Costfunctions.cross_entropy_grad
-network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
-
-print("Metric after initialization, after first epoch and last epoch ")
-print(network.get_train_met()[0,:], network.get_train_met()[1,:], network.get_train_met()[-1,:])
-print_metrik_by_network_and_epoch(epochs*2+1, [network.get_train_met()[:,0], network.get_test_met()[:,0]], "d", "cre_own_"+"_".join([network.name,"epochs",str(epochs),"lr",str(learning_rate),"nodes",str(n_middle),"batch_size",str(batch_size)]), "entropy")
-print_metrik_by_network_and_epoch(epochs*2+1, [network.get_train_met()[:,1], network.get_test_met()[:,1]], "d", "acc_own_"+"_".join([network.name,"epochs",str(epochs),"lr",str(learning_rate),"nodes",str(n_middle),"batch_size",str(batch_size)]), "accuracy")
-print_metrik_by_network_and_epoch(epochs*2+1, [network.get_train_met()[:,2], network.get_test_met()[:,2]], "d", "ceg_own_"+"_".join([network.name,"epochs",str(epochs),"lr",str(learning_rate),"nodes",str(n_middle),"batch_size",str(batch_size)]), "ent grad")
-"""
 
 #task_b_own()
 #task_b_keras()
