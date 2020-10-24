@@ -116,7 +116,7 @@ def full_network_test(cf, af, learning_rate, task, epochs=50):
         r2_train = r2_error(y_train, network.predict(x_train.T).T)[0]
         print("Cost function after initialization, after first epoch and last epoch ")
         print(network.train_C[0], network.train_C[1], network.train_C[-1])
-        print_cost_by_network_and_epoch(epochs, [network.train_C, network.test_C], task,
+        print_metrik_by_network_and_epoch(epochs, [network.train_C, network.test_C], task,
                                         "own_" + network.name + "_" + af.__name__)
         mse_errors.append([mse_test, mse_train])
         r2_scores.append([r2_test, r2_train])
@@ -146,7 +146,7 @@ def task_b_keras():
                   validation_data=(x_test, y_test), verbose=0)
         mse_errors.append([model.evaluate(x_test, y_test)[1], model.evaluate(x_train, y_train)[1]])
         r2_scores.append([model.evaluate(x_test, y_test)[2], model.evaluate(x_train, y_train)[2]])
-        print_cost_by_network_and_epoch(epochs-1, [history.history['loss'], history.history['val_loss']], "b", "keras_"+model.name)
+        print_metrik_by_network_and_epoch(epochs-1, [history.history['loss'], history.history['val_loss']], "b", "keras_"+model.name)
 
     mse_errors = np.array(mse_errors).reshape(n, 4).T
     r2_scores = np.array(r2_scores).reshape(n, 4).T
@@ -163,35 +163,57 @@ def task_c():
     full_network_test(Costfunctions.mse, ActivationFunctions.elu, learning_rate, "c", epochs=100)
 
 
+def prepare_digit_data():
+    digits = datasets.load_digits()
+    x = digits.data
+    t = digits.target
+    n_out = 10
+    y = np.zeros(shape=(x.shape[0], n_out))
+    y[np.arange(t.size), t] = 1
+    split_size = 0.8
+    x = (x - np.max(x) / 2) / (np.max(x) / 2)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, train_size=split_size)
+    return x_train, x_test, y_train, y_test
+
+
 def pred_to_class(y):
     r = np.argmax(y, axis=0)
     return r
 
-#def task_d():
-digits = datasets.load_digits()
-x = digits.data
-t = digits.target
-n_in = x.shape[1]
-n_out = 10
-n_middle = 256
-epochs = 100
-batch_size = 10
-y = np.zeros(shape=(x.shape[0], n_out))
-y[np.arange(t.size), t] = 1
-split_size = 0.8
-x = (x-np.max(x)/2)/(np.max(x)/2)
-#x = scale(x, axis=1)
 
-#nx = x[t == 0, :]
-#nx = np.append(nx, x[t == 1, :], axis=0)
-#ny = y[t == 0, 0:2]
-#ny = np.append(ny, y[t == 1, 0:2], axis=0)
-#n_out = 2
-#ny = ny[:, 0]
-#ny = np.expand_dims(ny, axis=1)
-#x_train, x_test, y_train, y_test = train_test_split(nx, ny, train_size=split_size)
-x_train, x_test, y_train, y_test = train_test_split(x, y, train_size=split_size)
-learning_rate = 0.001
+def task_d():
+    x_train, x_test, y_train, y_test = prepare_digit_data()
+    n_out = 10
+    n_in = x_train.shape[1]
+    n_middle = 256
+    epochs = 250
+    batch_size = 100
+    learning_rate = 0.0001
+    l_in = LayerDense(n_in, n_middle, "lin", learning_rate, Costfunctions.mse,
+                      ActivationFunctions.elu)
+    l_mi = LayerDense(n_middle, n_middle, "lmi2", learning_rate, Costfunctions.mse,
+                      ActivationFunctions.sigmoid)
+    l_ou = LayerDense(n_middle, n_out, "lou", learning_rate, Costfunctions.mse,
+                      ActivationFunctions.softmax)
+    network = Network([l_in, l_mi, l_ou], "mnist", [Metrics.mse, Metrics.accuracy])
+    network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
+    print("Metric after initialization, after first epoch and last epoch ")
+    print(network.get_train_met()[0,:], network.get_train_met()[1,:], network.get_train_met()[-1,:])
+    print_metrik_by_network_and_epoch(epochs, [network.get_train_met()[:,0], network.get_test_met()[:,0]], "d", "mse_own_"+"_".join([network.name,"epochs",str(epochs),"lr",str(learning_rate),"nodes",str(n_middle),"batch_size",str(batch_size)]), "entropy")
+    print_metrik_by_network_and_epoch(epochs, [network.get_train_met()[:,1], network.get_test_met()[:,1]], "d", "acc_own_"+"_".join([network.name,"epochs",str(epochs),"lr",str(learning_rate),"nodes",str(n_middle),"batch_size",str(batch_size)]), "accuracy")
+
+
+
+task_d()
+
+"""
+x_train, x_test, y_train, y_test = prepare_digit_data()
+n_out = 10
+n_in = x_train.shape[1]
+n_middle = 256
+learning_rate = 0.0001
+epochs = 250
+batch_size = 100
 
 l_in = LayerDense(n_in, n_middle, "lin", learning_rate, Costfunctions.mse,
                   ActivationFunctions.elu)
@@ -199,40 +221,20 @@ l_mi = LayerDense(n_middle, n_middle, "lmi", learning_rate, Costfunctions.mse,
                   ActivationFunctions.elu)
 l_mi2 = LayerDense(n_middle, n_middle, "lmi2", learning_rate, Costfunctions.mse,
                   ActivationFunctions.sigmoid)
-l_ou = LayerDense(n_middle, n_out, "lou", learning_rate, Costfunctions.cross_entropy,
+l_ou = LayerDense(n_middle, n_out, "lou", learning_rate, Costfunctions.mse,
                   ActivationFunctions.softmax)
-network = Network([l_in, l_mi2, l_ou], "mnist", Metrics.accuracy)
+network = Network([l_in, l_mi2, l_ou], "mnist", [Metrics.ce, Metrics.accuracy, Metrics.ce_grad])
+network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
+network.layers[-1].cf=Costfunctions.cross_entropy
+network.layers[-1].cf_grad=Costfunctions.cross_entropy_grad
 network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
 
-out_0=network.layers[0].output
-out_1=network.layers[1].output
-out_2=network.layers[2].output
-#out_3=network.layers[3].output
-#print(network.layers[0].output)
-#print(network.layers[1].output)
-r_test = pred_to_class(network.predict(x_test.T))
-r_train = pred_to_class(network.predict(x_train.T))
-y_test_c = pred_to_class(y_test.T)
-y_train_c = pred_to_class(y_train.T)
-acc_test = np.sum(r_test == y_test_c)/r_test.shape[0]
-acc_train = np.sum(r_train == y_train_c)/r_train.shape[0]
-print(acc_test, acc_train)
-
-
-r_test = network.predict(x_test.T)
-r_train = network.predict(x_train.T)
-acc_test = np.sum(np.abs(r_test - y_test.T) <= 0.1 * (y_test.T != 0))/r_test.shape[1]
-acc_train = np.sum(np.abs(r_train - y_train.T) <= 0.1 * (y_train.T != 0))/r_train.shape[1]
-print(acc_test, acc_train)
-#print(y_test.T)
-#print(r_test)
-
-
-
 print("Metric after initialization, after first epoch and last epoch ")
-print(network.train_M[0], network.train_M[1], network.train_M[-1])
-print_metrik_by_network_and_epoch(epochs, [network.train_M, network.test_M], "d", "own_"+network.name+"_elu", "accuracy")
-
+print(network.get_train_met()[0,:], network.get_train_met()[1,:], network.get_train_met()[-1,:])
+print_metrik_by_network_and_epoch(epochs*2+1, [network.get_train_met()[:,0], network.get_test_met()[:,0]], "d", "cre_own_"+"_".join([network.name,"epochs",str(epochs),"lr",str(learning_rate),"nodes",str(n_middle),"batch_size",str(batch_size)]), "entropy")
+print_metrik_by_network_and_epoch(epochs*2+1, [network.get_train_met()[:,1], network.get_test_met()[:,1]], "d", "acc_own_"+"_".join([network.name,"epochs",str(epochs),"lr",str(learning_rate),"nodes",str(n_middle),"batch_size",str(batch_size)]), "accuracy")
+print_metrik_by_network_and_epoch(epochs*2+1, [network.get_train_met()[:,2], network.get_test_met()[:,2]], "d", "ceg_own_"+"_".join([network.name,"epochs",str(epochs),"lr",str(learning_rate),"nodes",str(n_middle),"batch_size",str(batch_size)]), "ent grad")
+"""
 
 #task_b_own()
 #task_b_keras()
