@@ -283,14 +283,7 @@ class Network:
         #self.train_C.append(np.sum(error))
         #self.forward_pass(x_test)
         #error = self.layers[-1].cost_function(y_test, self.layers[-1].output, l)
-        if self.train_M is None:
-            self.train_M = self.metric(y, self.predict(x))
-        else:
-            self.train_M = np.append(self.train_M, self.metric(y, self.predict(x)), axis=1)
-        if self.test_M is None:
-            self.test_M = self.metric(y_test, self.predict(x_test))
-        else:
-            self.test_M = np.append(self.test_M, self.metric(y_test, self.predict(x_test)), axis=1)
+        self.app_metrics(x, x_test, y, y_test)
         pb.print_progress_bar(p)
         for i in range(epochs):
             for j in range(batches):
@@ -306,8 +299,7 @@ class Network:
                 self.backward_pass(self.layers[-1].cost_grad(yn, self.layers[-1].output, l))
                 lr = self.layers[-1].initial_learning_rate / (i*batches+j+1)
                 #self.adapt_learning_rate(lr)
-            self.train_M = np.append(self.train_M, self.metric(y, self.predict(x)), axis=1)
-            self.test_M = np.append(self.test_M, self.metric(y_test, self.predict(x_test)), axis=1)
+            self.app_metrics(x, x_test, y, y_test)
             #self.train_C.append(np.sum(error))
             #self.forward_pass(x_test)
             #error = self.layers[-1].cost_function(y_test, self.layers[-1].output, l)
@@ -340,9 +332,23 @@ class Network:
 
     def metric(self, y_true, y_pred):
         ms = []
+        if self.mf is None:
+            return ms
         for m in self.mf:
             ms.append(m(y_true, y_pred))
         return np.expand_dims(np.array(ms).T, axis=1)
+
+    def app_metrics(self, x_train, x_test, y_train, y_test):
+        if self.mf is None:
+            return
+        if self.train_M is None:
+            self.train_M = self.metric(y_train, self.predict(x_train))
+        else:
+            self.train_M = np.append(self.train_M, self.metric(y_train, self.predict(x_train)), axis=1)
+        if self.test_M is None:
+            self.test_M = self.metric(y_test, self.predict(x_test))
+        else:
+            self.test_M = np.append(self.test_M, self.metric(y_test, self.predict(x_test)), axis=1)
 
     def get_train_met(self):
         return self.train_M.T
