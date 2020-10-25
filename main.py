@@ -14,16 +14,13 @@ import numpy as np
 
 from sklearn import datasets
 
-#task_a()
-
 from keras import backend as K
 
 
-#https://jmlb.github.io/ml/2017/03/20/CoeffDetermination_CustomMetric4Keras/
+# https://jmlb.github.io/ml/2017/03/20/CoeffDetermination_CustomMetric4Keras/
 def coeff_determination(y_true, y_pred):
     r = (K.square(y_true - y_pred)) / K.sum(K.square(y_true - K.mean(y_pred)))
     return 1 - K.sum(r, axis=0)
-
 
 
 def create_terrain_data():
@@ -93,9 +90,17 @@ def create_keras_network_array(n_in, n_out, learning_rate, cf, af, start, stop, 
     return models
 
 
-def task_b_own():
-    learning_rate = 0.1
-    full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, learning_rate, "b")
+def prepare_digit_data():
+    digits = datasets.load_digits()
+    x = digits.data
+    t = digits.target
+    n_out = 10
+    y = np.zeros(shape=(x.shape[0], n_out))
+    y[np.arange(t.size), t] = 1
+    split_size = 0.8
+    x = (x - np.max(x) / 2) / (np.max(x) / 2)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, train_size=split_size)
+    return x_train, x_test, y_train, y_test
 
 
 def full_network_test(cf, af, learning_rate, task, epochs=50):
@@ -126,6 +131,11 @@ def full_network_test(cf, af, learning_rate, task, epochs=50):
                  xlabel="ln_2 of neurons per layer", ylabel="mse", task=task)
     print_errors(np.linspace(start, stop, n), r2_scores, ["short_test", "short_train", "long_test", "long_train"], "own_r_squared_"+af.__name__, logy=True,
                  xlabel="ln_2 of neurons per layer", ylabel="R^2 value", task=task)
+
+
+def task_b_own():
+    learning_rate = 0.1
+    full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, learning_rate, "b")
 
 
 def task_b_keras():
@@ -161,24 +171,6 @@ def task_c():
     full_network_test(Costfunctions.mse, ActivationFunctions.relu, learning_rate, "c", epochs=100)
     full_network_test(Costfunctions.mse, ActivationFunctions.leaky_relu, learning_rate, "c", epochs=100)
     full_network_test(Costfunctions.mse, ActivationFunctions.elu, learning_rate, "c", epochs=100)
-
-
-def prepare_digit_data():
-    digits = datasets.load_digits()
-    x = digits.data
-    t = digits.target
-    n_out = 10
-    y = np.zeros(shape=(x.shape[0], n_out))
-    y[np.arange(t.size), t] = 1
-    split_size = 0.8
-    x = (x - np.max(x) / 2) / (np.max(x) / 2)
-    x_train, x_test, y_train, y_test = train_test_split(x, y, train_size=split_size)
-    return x_train, x_test, y_train, y_test
-
-
-def pred_to_class(y):
-    r = np.argmax(y, axis=0)
-    return r
 
 
 def task_d():
@@ -235,3 +227,4 @@ def task_e():
 #task_b_keras()
 #task_c()
 #task_d()
+#task_a()
