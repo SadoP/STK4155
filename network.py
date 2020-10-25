@@ -55,66 +55,23 @@ class Costfunctions:
 
     @staticmethod
     def cross_entropy(y_true, y_pred, l):
-        #print(y_true)
-        #print(y_pred)
-        #print(np.sum(-y_true*np.log(y_pred), axis=0))
-        #print(y_true.shape)
-        #print(y_pred.shape)
-        #print(np.sum(-y_true*np.log(y_pred), axis=0).shape)
-        #print(np.max(np.sum(-y_true*np.log(y_pred), axis=0)))
         y_pred = y_pred + Costfunctions.eps
-        #print(y_true)
-        #print(y_pred)
-        #print(-np.sum(y_true*np.log(y_pred) +
-        #               (1-y_true)*np.log(1-y_pred), axis=0))
-        #print(y_pred.shape)
-        #print("sum")
-        #print(np.nansum(y_true*np.log(y_pred) + (1-y_true)*np.log(1-y_pred), axis=0).shape)
         return -np.nansum(y_true*np.log(y_pred) + (1-y_true)*np.log(1-y_pred), axis=0)
 
     @staticmethod
     def cross_entropy_grad(y_true, y_pred, l):
-        #print(y_true.shape)
-        #y_true = np.array([[0, 1, 0, 1, 0], [0, 0, 1, 0, 0], [1, 0, 0, 0, 1]])
-        #y_pred = np.array([[0, 0.4, 0.3, 0.1, 0], [0.2, 0.4, 0.4, 0.2, 0], [0.8, 0.2, 0.3, 0.7, 1]])
-        #eps = 1e-15
         y_pred = y_pred+Costfunctions.eps
-        #print(y_true)
-        #print(y_pred)
-        #print(y_true.shape)
-        #print(y_pred.shape)
-        #print((-y_true/y_pred).shape)
-        #print(-y_true/y_pred)
-        #print(np.max(np.abs(-y_true/y_pred + (1-y_true)/(1-y_pred))))
-        #(2*y_true-1)*(1-1/y_pred)
-        #print(- (y_true - y_true/y_pred + ((1-y_true)+(1-y_true)/(1-y_pred))))
-        #sys.exit()
-        #print(- (y_true - y_true/y_pred + ((1-y_true)+(1-y_true)/(1-y_pred))))
-
         return - (y_true - y_true/y_pred + ((y_true-1)+(1-y_true)/(1-y_pred)))
 
     @staticmethod
     def soft_max(y_true, y_pred, l):
-
-        #y_true = np.array([[0,0,1],[0,1,0]])
-        #y_pred = np.array([[0,0.8,0.2],[0.2,0.4,0.8]])
-        #print(y_pred.shape)
         z = np.exp(y_pred)
-        #print(z.shape)
-        #print(y_true.shape)
-        #print(np.sum(z, axis=0).shape)
         mul = np.log((z.T/np.sum(z, axis=1)).T)
-        #print(mul.shape)
-        #print(np.sum(z))
-        #print(np.sum(mul))
         res = - np.sum(y_true * mul, axis=1)
-        #print(res)
         return res
 
     @staticmethod
     def soft_max_grad(y_true, y_pred, l):
-        #y_true = np.array([[0,0,1],[0,1,0]])
-        #y_pred = np.array([[0,0.8,0.2],[0.2,0.4,0.8]])
         z = np.exp(y_pred)
         res = y_true * (1/z - (z.T/np.sum(z, axis=1)).T)
         return res
@@ -134,10 +91,6 @@ class ActivationFunctions:
     @staticmethod
     def softmax(x):
         z = np.exp(x)
-        #print(x)
-        #print("z")
-        #print(z)
-        #sys.exit()
         return z / np.sum(z, axis=0, keepdims=True)
 
     @staticmethod
@@ -224,7 +177,6 @@ class LayerDense(Layer):
         Layer.__init__(self, n_outputs, name, learning_rate, cost, activation)
         self.biases = 0.1*np.ones((n_outputs, 1))
         self.weights = 1*np.random.randn(n_outputs, n_inputs)
-        #self.weights = (self.weights.T / np.sum(self.weights, axis=1)).T
         self.bg = []
         self.wg = []
         self.initial_weights = self.weights
@@ -254,10 +206,6 @@ class LayerDense(Layer):
 
         self.biases = self.biases + self.learning_rate * self.bg
         self.weights = self.weights + self.learning_rate * self.wg
-
-
-        #self.biases = self.biases + self.learning_rate * self.bias_grad()
-        #self.weights = self.weights + self.learning_rate * self.weight_grad()
         return next_error
 
 
@@ -271,18 +219,11 @@ class Network:
         np.random.seed(RANDOM_SEED)
 
     def train(self, x, y, epochs, batch_size, x_test, y_test):
-        #self.train_C = []
         batches = int(np.floor(x.shape[1] / batch_size))
         p = 0
         pb = ProgressBar(total=epochs, prefix='', suffix='', decimals=3,
                          length=50, fill='=',
                          zfill='>')
-        #self.forward_pass(x)
-        #l = (np.sum(np.abs(self.layers[-1].weights), axis=1) + np.abs(self.layers[-1].biases.T)).T
-        #error = self.layers[-1].cost_function(y, self.layers[-1].output, l)
-        #self.train_C.append(np.sum(error))
-        #self.forward_pass(x_test)
-        #error = self.layers[-1].cost_function(y_test, self.layers[-1].output, l)
         self.app_metrics(x, x_test, y, y_test)
         pb.print_progress_bar(p)
         for i in range(epochs):
@@ -291,19 +232,9 @@ class Network:
                 yn = y[:, j * batch_size:(j + 1) * batch_size]
                 self.forward_pass(xn)
                 l = (np.sum(np.abs(self.layers[-1].weights), axis=1) + np.abs(self.layers[-1].biases.T)).T
-                #print(l)
-                #error = self.layers[-1].cost_function(yn, self.layers[-1].output, l)
-                #print(error)
-                #sys.exit()
-                #print(np.max(self.layers[-1].cost_grad(yn, self.layers[-1].output, l)))
                 self.backward_pass(self.layers[-1].cost_grad(yn, self.layers[-1].output, l))
                 lr = self.layers[-1].initial_learning_rate / (i*batches+j+1)
-                #self.adapt_learning_rate(lr)
             self.app_metrics(x, x_test, y, y_test)
-            #self.train_C.append(np.sum(error))
-            #self.forward_pass(x_test)
-            #error = self.layers[-1].cost_function(y_test, self.layers[-1].output, l)
-            #self.test_C.append(np.sum(error))
             self.inc_epoch()
             p += 1
             pb.print_progress_bar(p)
@@ -326,7 +257,6 @@ class Network:
             layer.increment_epoch()
 
     def adapt_learning_rate(self, lr):
-        #pass
         for layer in self.layers:
             layer.learning_rate = lr
 
