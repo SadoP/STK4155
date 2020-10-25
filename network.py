@@ -1,8 +1,5 @@
-import sys
-
 import numpy as np
 from typing import List
-
 from console_progressbar import ProgressBar
 
 RANDOM_SEED = 1337
@@ -131,6 +128,7 @@ class ActivationFunctions:
     def linear_grad(x):
         return 1
 
+
 class Layer:
     def __init__(self, n_outputs, name, learning_rate, cf, af):
         self.output = np.zeros((n_outputs, 1))
@@ -173,7 +171,7 @@ class Layer:
 
 
 class LayerDense(Layer):
-    def __init__(self,n_inputs, n_outputs, name, learning_rate, cost, activation):
+    def __init__(self, n_inputs, n_outputs, name, learning_rate, cost, activation):
         Layer.__init__(self, n_outputs, name, learning_rate, cost, activation)
         self.biases = 0.1*np.ones((n_outputs, 1))
         self.weights = 1*np.random.randn(n_outputs, n_inputs)
@@ -274,7 +272,8 @@ class Network:
         if self.train_M is None:
             self.train_M = self.metric(y_train, self.predict(x_train))
         else:
-            self.train_M = np.append(self.train_M, self.metric(y_train, self.predict(x_train)), axis=1)
+            self.train_M = np.append(self.train_M, self.metric(y_train, self.predict(x_train)),
+                                     axis=1)
         if self.test_M is None:
             self.test_M = self.metric(y_test, self.predict(x_test))
         else:
