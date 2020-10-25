@@ -29,6 +29,10 @@ class Metrics:
     def ce_grad(y_true, y_pred):
         return np.max(np.abs(Costfunctions.cross_entropy_grad(y_true, y_pred, None)))
 
+    @staticmethod
+    def coeff_determination(y_true, y_pred):
+        r = (np.square(y_true - y_pred)) / np.sum(np.square(y_true - np.mean(y_pred)))
+        return np.sum(1 - np.sum(r, axis=1))
 
 class Costfunctions:
     la = 0.1
