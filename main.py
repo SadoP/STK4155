@@ -239,9 +239,9 @@ def task_d():
     n_out = 10
     n_in = x_train.shape[1]
     n_middle = 256
-    epochs = 250
+    epochs = 2000
     batch_size = 100
-    learning_rate = 0.0001
+    learning_rate = 0.001
     l_in = LayerDense(n_in, n_middle, "lin", learning_rate, Costfunctions.mse,
                       ActivationFunctions.elu)
     l_mi = LayerDense(n_middle, n_middle, "lmi2", learning_rate, Costfunctions.mse,
@@ -250,18 +250,21 @@ def task_d():
                       ActivationFunctions.softmax)
     network = Network([l_in, l_mi, l_ou], "mnist", [Metrics.mse, Metrics.accuracy])
     network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
-    print("Metric after initialization, after first epoch and last epoch ")
+    print("Training metric after initialization, after first epoch and last epoch ")
     print(network.get_train_met()[0, :], network.get_train_met()[1, :],
           network.get_train_met()[-1, :])
+    print("Testing metric after initialization, after first epoch and last epoch ")
+    print(network.get_test_met()[0, :], network.get_test_met()[1, :],
+          network.get_test_met()[-1, :])
     print_metrik_by_network_and_epoch(epochs,
                                       [network.get_train_met()[:, 0], network.get_test_met()[:, 0]],
                                       "d", "mse_own_" + "_".join(
-            [network.name, "epochs", str(epochs), "lr", str(learning_rate), "nodes", str(n_middle),
-             "batch_size", str(batch_size)]), "entropy")
+            [network.name, "epochs", str(2000), "lr", str(learning_rate), "nodes", str(n_middle),
+             "batch_size", str(batch_size)]), "Mean squared error")
     print_metrik_by_network_and_epoch(epochs,
                                       [network.get_train_met()[:, 1], network.get_test_met()[:, 1]],
                                       "d", "acc_own_" + "_".join(
-            [network.name, "epochs", str(epochs), "lr", str(learning_rate), "nodes", str(n_middle),
+            [network.name, "epochs", str(2000), "lr", str(learning_rate), "nodes", str(n_middle),
              "batch_size", str(batch_size)]), "accuracy")
 
 
@@ -269,37 +272,33 @@ def task_e():
     x_train, x_test, y_train, y_test = prepare_digit_data()
     n_out = 10
     n_in = x_train.shape[1]
-    n_middle = 256
-    learning_rate = 0.0001
-    epochs = 250
+    n_middle = 128
+    learning_rate = 0.00001
+    epochs = 2000
     batch_size = 100
 
     l_in = LayerDense(n_in, n_middle, "lin", learning_rate, Costfunctions.mse,
                       ActivationFunctions.elu)
     l_mi = LayerDense(n_middle, n_middle, "lmi", learning_rate, Costfunctions.mse,
                       ActivationFunctions.sigmoid)
-    l_ou = LayerDense(n_middle, n_out, "lou", learning_rate, Costfunctions.mse,
+    l_ou = LayerDense(n_middle, n_out, "lou", learning_rate, Costfunctions.cross_entropy,
                       ActivationFunctions.softmax)
     network = Network([l_in, l_mi, l_ou], "mnist", [Metrics.ce, Metrics.accuracy, Metrics.ce_grad])
     network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
-    network.layers[-1].cf = Costfunctions.cross_entropy
-    network.layers[-1].cf_grad = Costfunctions.cross_entropy_grad
-    network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
-
     print("Metric after initialization, after first epoch and last epoch ")
     print(network.get_train_met()[0, :], network.get_train_met()[1, :],
           network.get_train_met()[-1, :])
-    print_metrik_by_network_and_epoch(epochs * 2 + 1,
+    print_metrik_by_network_and_epoch(epochs,
                                       [network.get_train_met()[:, 0], network.get_test_met()[:, 0]],
                                       "e", "cre_own_" + "_".join(
             [network.name, "epochs", str(epochs), "lr", str(learning_rate), "nodes", str(n_middle),
              "batch_size", str(batch_size)]), "entropy")
-    print_metrik_by_network_and_epoch(epochs * 2 + 1,
+    print_metrik_by_network_and_epoch(epochs,
                                       [network.get_train_met()[:, 1], network.get_test_met()[:, 1]],
                                       "e", "acc_own_" + "_".join(
             [network.name, "epochs", str(epochs), "lr", str(learning_rate), "nodes", str(n_middle),
              "batch_size", str(batch_size)]), "accuracy")
-    print_metrik_by_network_and_epoch(epochs * 2 + 1,
+    print_metrik_by_network_and_epoch(epochs,
                                       [network.get_train_met()[:, 2], network.get_test_met()[:, 2]],
                                       "e", "ceg_own_" + "_".join(
             [network.name, "epochs", str(epochs), "lr", str(learning_rate), "nodes", str(n_middle),

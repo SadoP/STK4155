@@ -27,7 +27,7 @@ class Metrics:
 
     @staticmethod
     def ce_grad(y_true, y_pred):
-        return np.max(np.abs(Costfunctions.cross_entropy_grad(y_true, y_pred, None)))
+        return np.mean(np.abs(Costfunctions.cross_entropy_grad(y_true, y_pred, None)))
 
     @staticmethod
     def coeff_determination(y_true, y_pred):
@@ -57,12 +57,19 @@ class Costfunctions:
     @staticmethod
     def cross_entropy(y_true, y_pred, l):
         y_pred = y_pred + Costfunctions.eps
+        return -np.nansum(y_true * np.log(y_pred) - np.log(1+y_pred), axis=0)
+
+    """
+    @staticmethod
+    def cross_entropy(y_true, y_pred, l):
+        y_pred = y_pred + Costfunctions.eps
         return -np.nansum(y_true*np.log(y_pred) + (1-y_true)*np.log(1-y_pred), axis=0)
+    """
 
     @staticmethod
     def cross_entropy_grad(y_true, y_pred, l):
-        y_pred = y_pred+Costfunctions.eps
-        return - (y_true - y_true/y_pred + ((y_true-1)+(1-y_true)/(1-y_pred)))
+        y_pred = y_pred + Costfunctions.eps
+        return y_true - y_pred/(1+y_pred)
 
     @staticmethod
     def soft_max(y_true, y_pred, l):
