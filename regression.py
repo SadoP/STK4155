@@ -356,6 +356,7 @@ def print_errors(x_values: np.array, errors: np.array, labels: list, name: str, 
         plt.xscale('log')
     fig.tight_layout()
     fig.savefig("images/" + task + "/" + name + ".png", dpi=300)
+    plt.close()
     return fig
 
 
@@ -634,7 +635,7 @@ def train_print_single_lambda(deg: int, epochs: int, batches: int, la: float = 0
 
 
 def task_a():
-    deg = 10
+    deg = 20
     epochs = EPOCHS
     batches = BATCHES
     g0 = LEARNING_RATE
@@ -657,6 +658,7 @@ def task_a():
     epochs = np.linspace(1, 150, 150, dtype=int)
     batches = np.array([batches])
     lrs = np.logspace(-8, 2, num=9*10+1)
+    deg = 10
     print("Finding ideal learning rate with estimated batch numbers and epochs")
     train_print_hyperparameter(deg=deg, parameter=["learning_rate"], lrv=lrs,
                                solver="ols", epochv=epochs, batchv=batches, task="a", d=6)
@@ -666,29 +668,31 @@ def task_a():
     print("Narrowing overall parameters down")
     train_print_hyperparameter(deg=deg, parameter=["learning_rate", "batch", "epoch"], lrv=lrs,
                                solver="ols", epochv=epochs, batchv=batches, task="a", d=6)
-    print("large epochs still produce (probably only slightly) better results. Testing for lage"
+    print("large epochs still produce (probably only slightly) better results. Testing for large "
           "epochs")
-    lrs = np.array([1e-3])
-    batches = np.array([25])
+    lrs = np.array([1.20e-3])
+    batches = np.array([12])
     epochs = np.linspace(1, 500, 500, dtype=int)
     train_print_hyperparameter(deg=deg, parameter=["epoch"], lrv=lrs,
                                solver="ols", epochv=epochs, batchv=batches, task="a", d=6)
     print("The mean square error still decreases even after 500 epochs, but the most improvement is"
-          "done after 100 epochs. For the sake of computing time I limit myself to 100 epochs")
-    lrs = np.array([1e-3])
-    batches = np.linspace(1, 30, 30, dtype=int)
-    epochs = np.linspace(1, 100, 100, dtype=int)
-    print("finding good number for amount of batches")
-    train_print_hyperparameter(deg=deg, parameter=["batch"], lrv=lrs,
-                               solver="ols", epochv=epochs, batchv=batches, task="a", d=6)
-    print("Choosing batches somewhere that matches both training and testing data")
-    epochs = np.linspace(1, 100, 100, dtype=int)
-    batches = np.array([26])
-    lrs = np.logspace(-1, -5, 7*10+1)
-    lambdas = np.logspace(-7, 2, num=10*10+1)
-    print("using previously established results to find good hyperparameters for ridge regression")
-    train_print_hyperparameter(deg=deg, parameter=["lambda", "epoch", "batch", "learning rate"], lrv=lrs, solver="ridge",
-                               epochv=epochs, batchv=batches, lambdav=lambdas, task="a", d=6)
+          "done after 100 epochs. For the sake of computing time I limit myself to 150 epochs")
+    print("Choosing batches and learning rate that matches testing data")
+    epochs = np.linspace(1, 150, 150, dtype=int)
+    batches = np.array([18])
+    lrs = np.array([1.2e-3])
+    lambdas = np.logspace(-9, 5, num=15*20+1)
+    print("Finding ideal lambda with estimated batch numbers and epochs")
+    train_print_hyperparameter(deg=deg, parameter=["lambda"], lrv=lrs, lambdav=lambdas,
+                               solver="ridge", epochv=epochs, batchv=batches, task="a", d=6)
+
+    epochs = np.linspace(1, 150, 150, dtype=int)
+    batches = np.array([18])
+    lrs = np.array([1.2e-3])
+    lambdas = np.array([1])
+    print("Finding ideal lambda with estimated batch numbers and epochs")
+    train_print_hyperparameter(deg=deg, parameter=["epoch"], lrv=lrs, lambdav=lambdas,
+                               solver="ridge", epochv=epochs, batchv=batches, task="a", d=6)
 
 
 NOISE_LEVEL = 0.1

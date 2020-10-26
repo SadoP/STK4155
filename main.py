@@ -53,12 +53,12 @@ def print_metrik_by_network_and_epoch(num_epochs, metric, task, name, metric_nam
     plt.close()
 
 
-def create_network_array(n_in, n_out, learning_rate, cf, af, start, stop, mf):
+def create_network_array(n_in, n_out, learning_rate, cf, af, laf, start, stop, mf):
     networks = []
     for i in range(start, stop + 1):
         li = LayerDense(n_in, 2 ** i, "ldi" + str(i), learning_rate, cf, af)
         lm = LayerDense(2 ** i, 2 ** i, "ldm" + str(i), learning_rate, cf, af)
-        lo = LayerDense(2 ** i, n_out, "lo" + str(i), learning_rate, cf, ActivationFunctions.relu)
+        lo = LayerDense(2 ** i, n_out, "lo" + str(i), learning_rate, cf, laf)
         networks.append(Network([li, lo], str(i) + "short", mf))
         networks.append(Network([li, lm, lo], str(i) + "long", mf))
     return networks
@@ -71,7 +71,7 @@ def create_keras_network_array(n_in, n_out, learning_rate, cf, af, start, stop, 
         model1.add(
             layers.Dense(n_in, input_shape=(n_in,), activation=af, kernel_initializer='he_uniform'))
         model1.add(layers.Dense(2 ** i, activation=af, kernel_initializer='he_uniform'))
-        model1.add(layers.Dense(n_out, activation='relu', kernel_initializer='he_uniform'))
+        model1.add(layers.Dense(n_out, activation='elu', kernel_initializer='he_uniform'))
         plot_model(model1, to_file='images/b/' + model1.name + '.png', show_shapes=True,
                    show_layer_names=True)
         # model1.summary()
@@ -82,7 +82,7 @@ def create_keras_network_array(n_in, n_out, learning_rate, cf, af, start, stop, 
             layers.Dense(n_in, input_shape=(n_in,), activation=af, kernel_initializer='he_uniform'))
         model2.add(layers.Dense(2 ** i, activation=af))
         model2.add(layers.Dense(2 ** i, activation=af))
-        model2.add(layers.Dense(n_out, activation='relu'))
+        model2.add(layers.Dense(n_out, activation='elu'))
         plot_model(model2, to_file='images/' + task + '/' + model2.name + '.png', show_shapes=True,
                    show_layer_names=True)
         # model2.summary()
@@ -108,22 +108,23 @@ def prepare_digit_data():
     return x_train, x_test, y_train, y_test
 
 
-def full_network_test(cf, af, learning_rate, task, epochs=100):
+def full_network_test(cf, af, laf, learning_rate, task, epochs=100):
     """cf = Costfunctions.mse
     af = ActivationFunctions.sigmoid
+    laf = ActivationFunctions.linear
     learning_rate = 0.01
     task = "b"
-    epochs = 100"""
+    epochs = 150"""
     x_train, x_test, y_train, y_test = create_terrain_data()
-    start = 3
+    start = 0
     stop = 8
     n = stop - start + 1
-    networks = create_network_array(x_train.shape[1], y_train.shape[1], learning_rate, cf, af,
+    networks = create_network_array(x_train.shape[1], y_train.shape[1], learning_rate, cf, af, laf,
                                     start, stop, [Metrics.mse, Metrics.coeff_determination])
     batch_size = 50
     mse_errors = []
     r2_scores = []
-    #network = networks[0]
+    # network = networks[0]
     for network in networks:
         network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
         mse_test = network.get_test_met()[:, 0]
@@ -132,36 +133,31 @@ def full_network_test(cf, af, learning_rate, task, epochs=100):
         r2_train = network.get_train_met()[:, 1]
         print("Metrics after initialization, after first epoch and last epoch ")
         print(mse_train[0], r2_train[0], mse_train[1], r2_train[1], mse_train[-1], r2_train[-1])
-        print_metrik_by_network_and_epoch(epochs, [mse_train, mse_test], task, "own_" +
-                                          network.name + "_" + af.__name__ + "_" + "mse", "mse")
-        print_metrik_by_network_and_epoch(epochs, [r2_train, r2_test], task, "own_" +
-                                          network.name + "_" + af.__name__ + "_" + "r_squared", "r2")
+        print_metrik_by_network_and_epoch(epochs, [mse_train, mse_test], task,
+                                          "_".join(["own", network.name, laf.__name__, str(learning_rate), af.__name__, "mse"]),
+                                          "mse")
+        print_metrik_by_network_and_epoch(epochs, [r2_train, r2_test], task,
+                                          "_".join(["own", network.name, laf.__name__, str(learning_rate), af.__name__, "r_squared"]),
+                                          "r2")
         mse_errors.append([mse_test[-1], mse_train[-1]])
         r2_scores.append([r2_test[-1], r2_train[-1]])
     mse_errors = np.array(mse_errors).reshape(n, 4).T
     r2_scores = np.array(r2_scores).reshape(n, 4).T
     print_errors(np.linspace(start, stop, n), mse_errors, ["short_test", "short_train", "long_test",
-                                                           "long_train"], "own_mse_" + af.__name__,
+                                                           "long_train"], "_".join(["own", "mse", laf.__name__, str(learning_rate), af.__name__]),
                  logy=True, xlabel="ln_2 of neurons per layer",
                  ylabel="mse", task=task)
     print_errors(np.linspace(start, stop, n), r2_scores, ["short_test", "short_train", "long_test",
-                                                          "long_train"], "own_r_squared_" +
-                 af.__name__, logy=True, xlabel="ln_2 of neurons per layer", ylabel="R^2 value",
+                                                          "long_train"], "_".join(["own", "r_squared", laf.__name__, str(learning_rate), af.__name__]), logy=True, xlabel="ln_2 of neurons per layer", ylabel="R^2 value",
                  task=task)
+    return networks
 
 
-def task_b_own():
-    learning_rate = 0.001
-    full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, learning_rate, "b", 250)
-
-
-def task_b_keras():
+def full_network_test_keras(learning_rate, epochs, task):
     x_train, x_test, y_train, y_test = create_terrain_data()
-    learning_rate = 0.001
-    start = 3
+    start = 0
     stop = 8
     n = stop - start + 1
-    epochs = 50
     batch_size = 50
     models = create_keras_network_array(x_train.shape[1], y_train.shape[1], learning_rate,
                                         'MeanSquaredError', 'sigmoid', start, stop, "b")
@@ -175,25 +171,67 @@ def task_b_keras():
         r2_scores.append([model.evaluate(x_test, y_test)[2], model.evaluate(x_train, y_train)[2]])
         print_metrik_by_network_and_epoch(epochs - 1,
                                           [history.history['loss'], history.history['val_loss']],
-                                          "b", "keras_" + model.name)
+                                          task, "_".join(["keras", model.name, "learning_rate",
+                                                         str(learning_rate)]), "mse")
 
     mse_errors = np.array(mse_errors).reshape(n, 4).T
     r2_scores = np.array(r2_scores).reshape(n, 4).T
     print_errors(np.linspace(start, stop, n), mse_errors,
-                 ["short_test", "short_train", "long_test", "long_train"], "keras_mse", logy=True,
-                 xlabel="ln_2 of neurons per layer", ylabel="mse", task="b")
+                 ["short_test", "short_train", "long_test", "long_train"],
+                 "_".join(["keras_mse", "learning_rate", str(learning_rate)]), logy=True,
+                 xlabel="ln_2 of neurons per layer", ylabel="mse", task=task)
     print_errors(np.linspace(start, stop, n), r2_scores,
-                 ["short_test", "short_train", "long_test", "long_train"], "keras_r_squared",
-                 logy=True,
-                 xlabel="ln_2 of neurons per layer", ylabel="R^2 value", task="b")
+                 ["short_test", "short_train", "long_test", "long_train"],
+                 "_".join(["keras_r_squared", "learning_rate", str(learning_rate)]),
+                 logy=True, xlabel="ln_2 of neurons per layer", ylabel="R^2 value", task=task)
+
+
+def task_b_own():
+    learning_rate = 0.0001
+    n1 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, ActivationFunctions.linear,
+                      learning_rate, "b", 100)
+    n2 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, ActivationFunctions.elu,
+                      learning_rate, "b", 100)
+    learning_rate = 0.001
+    n3 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, ActivationFunctions.linear,
+                      learning_rate, "b", 100)
+    n4 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, ActivationFunctions.elu,
+                      learning_rate, "b", 100)
+    learning_rate = 0.01
+    n5 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid,
+                           ActivationFunctions.linear,
+                           learning_rate, "b", 100)
+    n6 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, ActivationFunctions.elu,
+                           learning_rate, "b", 100)
+    learning_rate = 0.1
+    n7 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, ActivationFunctions.linear,
+                      learning_rate, "b", 100)
+    n8 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, ActivationFunctions.elu,
+                      learning_rate, "b", 100)
+    learning_rate = 1
+    n9 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, ActivationFunctions.linear,
+                      learning_rate, "b", 100)
+    n10 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, ActivationFunctions.elu,
+                      learning_rate, "b", 100)
+
+
+def task_b_keras():
+    learning_rate = 0.001
+    epochs = 100
+    task = "b"
+    full_network_test_keras(learning_rate, epochs, task)
+    learning_rate = 0.01
+    full_network_test_keras(learning_rate, epochs, task)
 
 
 def task_c():
-    learning_rate = 0.1
-    full_network_test(Costfunctions.mse, ActivationFunctions.relu, learning_rate, "c", epochs=100)
-    full_network_test(Costfunctions.mse, ActivationFunctions.leaky_relu, learning_rate, "c",
-                      epochs=100)
-    full_network_test(Costfunctions.mse, ActivationFunctions.elu, learning_rate, "c", epochs=100)
+    learning_rate = 0.001
+    full_network_test(Costfunctions.mse, ActivationFunctions.leaky_relu,
+                      ActivationFunctions.elu, learning_rate, "c", epochs=100)
+    full_network_test(Costfunctions.mse, ActivationFunctions.linear,
+                      ActivationFunctions.elu, learning_rate, "c", epochs=100)
+    full_network_test(Costfunctions.mse, ActivationFunctions.relu,
+                      ActivationFunctions.elu, learning_rate, "c", epochs=100)
 
 
 def task_d():

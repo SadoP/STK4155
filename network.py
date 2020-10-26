@@ -19,7 +19,7 @@ class Metrics:
 
     @staticmethod
     def mse(y_true, y_pred):
-        return np.sum(Costfunctions.mse(y_true, y_pred, None))
+        return np.sum(Costfunctions.mse(y_true, y_pred, None)) * 2 / np.size(y_true)
 
     @staticmethod
     def ce(y_true, y_pred):
@@ -31,8 +31,8 @@ class Metrics:
 
     @staticmethod
     def coeff_determination(y_true, y_pred):
-        r = (np.square(y_true - y_pred)) / np.sum(np.square(y_true - np.mean(y_pred)))
-        return np.sum(1 - np.sum(r, axis=1))
+        r = (np.square(y_true - y_pred)) / np.sum(np.square(y_true - np.mean(y_true)))
+        return 1 - np.sum(r)
 
 class Costfunctions:
     la = 0.1
@@ -80,6 +80,7 @@ class Costfunctions:
 
 class ActivationFunctions:
     alpha = 0.02
+    beta = 1
 
     @staticmethod
     def sigmoid(x):
@@ -110,11 +111,11 @@ class ActivationFunctions:
 
     @staticmethod
     def elu(x):
-        return (x > 0) * x + (x < 0) * ActivationFunctions.alpha * (np.exp(x)-1)
+        return (x > 0) * x + (x < 0) * ActivationFunctions.beta * (np.exp(x)-1)
 
     @staticmethod
     def elu_grad(x):
-        return (x > 0) * 1 + (x < 0) * np.exp(x)*ActivationFunctions.alpha
+        return (x > 0) * 1 + (x < 0) * np.exp(x)*ActivationFunctions.beta
 
     @staticmethod
     def leaky_relu(x):
