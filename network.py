@@ -15,7 +15,7 @@ class Metrics:
     def accuracy(y_true, y_pred):
         y_true = Metrics.pred_to_class(y_true)
         y_pred = Metrics.pred_to_class(y_pred)
-        return np.sum(y_true == y_pred) / y_pred.__len__()
+        return np.sum(y_true == y_pred) / len(y_pred)
 
     @staticmethod
     def mse(y_true, y_pred):
@@ -33,6 +33,7 @@ class Metrics:
     def coeff_determination(y_true, y_pred):
         r = (np.square(y_true - y_pred)) / np.sum(np.square(y_true - np.mean(y_true)))
         return 1 - np.sum(r)
+
 
 class Costfunctions:
     la = 0.1
@@ -57,19 +58,12 @@ class Costfunctions:
     @staticmethod
     def cross_entropy(y_true, y_pred, l):
         y_pred = y_pred + Costfunctions.eps
-        return -np.nansum(y_true * np.log(y_pred) - np.log(1+y_pred), axis=0)
-
-    """
-    @staticmethod
-    def cross_entropy(y_true, y_pred, l):
-        y_pred = y_pred + Costfunctions.eps
-        return -np.nansum(y_true*np.log(y_pred) + (1-y_true)*np.log(1-y_pred), axis=0)
-    """
+        return - np.nanmean(y_true * np.log(y_pred) + (1-y_true)*np.log(1-y_pred), axis=0)
 
     @staticmethod
     def cross_entropy_grad(y_true, y_pred, l):
         y_pred = y_pred + Costfunctions.eps
-        return y_true - y_pred/(1+y_pred)
+        return -(y_pred - y_true)/(y_pred*(1-y_pred))/y_true.shape[0]
 
     @staticmethod
     def soft_max(y_true, y_pred, l):
