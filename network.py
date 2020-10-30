@@ -41,11 +41,11 @@ class Costfunctions:
 
     @staticmethod
     def mse(y_true, y_pred, l):
-        return 1/2*sum((y_true - y_pred)**2)
+        return 1/2*np.sum((y_true - y_pred)**2, axis=1)
 
     @staticmethod
     def mse_grad(y_true, y_pred, l):
-        return y_true - y_pred
+        return y_pred - y_true
 
     @staticmethod
     def ridge(y_true, y_pred, l):
@@ -53,7 +53,7 @@ class Costfunctions:
 
     @staticmethod
     def ridge_grad(y_true, y_pred, l):
-        return y_true - y_pred + Costfunctions.la*l
+        return -(y_true - y_pred + Costfunctions.la*l)
 
     @staticmethod
     def cross_entropy(y_true, y_pred, l):
@@ -63,7 +63,7 @@ class Costfunctions:
     @staticmethod
     def cross_entropy_grad(y_true, y_pred, l):
         y_pred = y_pred + Costfunctions.eps
-        return -(y_pred - y_true)/(y_pred*(1-y_pred))/y_true.shape[0]
+        return (y_pred - y_true)/(y_pred*(1-y_pred))/y_true.shape[0]
 
     @staticmethod
     def soft_max(y_true, y_pred, l):
@@ -75,7 +75,7 @@ class Costfunctions:
     @staticmethod
     def soft_max_grad(y_true, y_pred, l):
         z = np.exp(y_pred)
-        res = y_true * (1/z - (z.T/np.sum(z, axis=1)).T)
+        res = - y_true * (1/z - (z.T/np.sum(z, axis=1)).T)
         return res
 
 
@@ -208,8 +208,8 @@ class LayerDense(Layer):
         self.bg = b_grad / np.sqrt(self.bias_s + self.eps)
         self.wg = w_grad / np.sqrt(self.weight_s + self.eps)
 
-        self.biases = self.biases + self.learning_rate * self.bg
-        self.weights = self.weights + self.learning_rate * self.wg
+        self.biases = self.biases - self.learning_rate * self.bg
+        self.weights = self.weights - self.learning_rate * self.wg
         return next_error
 
 
