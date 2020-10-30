@@ -1,6 +1,3 @@
-import sys
-
-from sklearn.preprocessing import scale
 from tensorflow.python.keras.utils.vis_utils import plot_model
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -109,12 +106,6 @@ def prepare_digit_data():
 
 
 def full_network_test(cf, af, laf, learning_rate, task, epochs=100):
-    """cf = Costfunctions.mse
-    af = ActivationFunctions.sigmoid
-    laf = ActivationFunctions.linear
-    learning_rate = 0.01
-    task = "b"
-    epochs = 150"""
     x_train, x_test, y_train, y_test = create_terrain_data()
     start = 0
     stop = 8
@@ -124,7 +115,6 @@ def full_network_test(cf, af, laf, learning_rate, task, epochs=100):
     batch_size = 50
     mse_errors = []
     r2_scores = []
-    # network = networks[0]
     for network in networks:
         network.train(x_train.T, y_train.T, epochs, batch_size, x_test.T, y_test.T)
         mse_test = network.get_test_met()[:, 0]
@@ -198,8 +188,7 @@ def task_b_own():
     n4 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, ActivationFunctions.elu,
                       learning_rate, "b", 100)
     learning_rate = 0.01
-    n5 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid,
-                           ActivationFunctions.linear,
+    n5 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, ActivationFunctions.linear,
                            learning_rate, "b", 100)
     n6 = full_network_test(Costfunctions.mse, ActivationFunctions.sigmoid, ActivationFunctions.elu,
                            learning_rate, "b", 100)
@@ -234,14 +223,13 @@ def task_c():
                       ActivationFunctions.elu, learning_rate, "c", epochs=100)
 
 
-def task_d():
+def digit_prediction_mse(learning_rate, nodes):
+    n_middle = nodes
     x_train, x_test, y_train, y_test = prepare_digit_data()
     n_out = 10
     n_in = x_train.shape[1]
-    n_middle = 256
     epochs = 2000
     batch_size = 100
-    learning_rate = 0.001
     l_in = LayerDense(n_in, n_middle, "lin", learning_rate, Costfunctions.mse,
                       ActivationFunctions.elu)
     l_mi = LayerDense(n_middle, n_middle, "lmi2", learning_rate, Costfunctions.mse,
@@ -266,6 +254,13 @@ def task_d():
                                       "d", "acc_own_" + "_".join(
             [network.name, "epochs", str(2000), "lr", str(learning_rate), "nodes", str(n_middle),
              "batch_size", str(batch_size)]), "accuracy")
+
+
+def task_d():
+    digit_prediction_mse(0.0001, 256)
+    digit_prediction_mse(0.0001, 128)
+    digit_prediction_mse(0.0001, 512)
+    digit_prediction_mse(0.001, 256)
 
 
 def task_e():
@@ -310,8 +305,10 @@ def task_e():
             [network.name, "epochs", str(epochs), "lr", str(learning_rate), "nodes", str(n_middle),
              "batch_size", str(batch_size)]), "mse")
 
-# task_b_own()
-# task_b_keras()
-# task_c()
-# task_d()
-# task_a()
+
+task_a()
+task_b_own()
+task_b_keras()
+task_c()
+task_d()
+task_e()

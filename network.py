@@ -237,7 +237,6 @@ class Network:
                 self.forward_pass(xn)
                 l = (np.sum(np.abs(self.layers[-1].weights), axis=1) + np.abs(self.layers[-1].biases.T)).T
                 self.backward_pass(self.layers[-1].cost_grad(yn, self.layers[-1].output, l))
-                lr = self.layers[-1].initial_learning_rate / (i*batches+j+1)
             self.app_metrics(x, x_test, y, y_test)
             self.inc_epoch()
             p += 1
