@@ -23,7 +23,7 @@ class Metrics:
 
     @staticmethod
     def ce(y_true, y_pred):
-        return np.sum(Costfunctions.cross_entropy(y_true, y_pred, None))
+        return np.sum(Costfunctions.cross_entropy(y_true, y_pred, None)) / y_pred.shape[1]
 
     @staticmethod
     def ce_grad(y_true, y_pred):
