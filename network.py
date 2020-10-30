@@ -19,7 +19,7 @@ class Metrics:
 
     @staticmethod
     def mse(y_true, y_pred):
-        return np.sum(Costfunctions.mse(y_true, y_pred, None)) * 2 / np.size(y_true)
+        return np.sum(Costfunctions.mse(y_true, y_pred, None)) / y_pred.shape[1]
 
     @staticmethod
     def ce(y_true, y_pred):
