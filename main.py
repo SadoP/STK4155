@@ -213,6 +213,7 @@ def task_b_keras():
     full_network_test_keras(learning_rate, epochs, task)
 
 
+
 def task_c():
     learning_rate = 0.001
     full_network_test(Costfunctions.mse, ActivationFunctions.leaky_relu,
